@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krishisense"
+version = "0.1.0"
+description = "Irrigation advisor for the KrishiSense solar soil & weather station"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Shaswat Mohanty" }]
+dependencies = ["requests>=2.28", "numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+krishisense = "krishisense.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["krishisense*"]

@@ -1,0 +1,13 @@
+# secrets / local config
+firmware/include/config.h
+server/stations.json
+.env
+# data
+*.db
+# build
+.pio/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/

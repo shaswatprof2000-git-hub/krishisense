@@ -1,0 +1,28 @@
+{
+  "stations": [
+    {
+      "station_id": "phulnakhara-01",
+      "name": "Phulnakhara Plot 1",
+      "device_key": "change-me-long-random-string",
+      "lat": 20.39,
+      "lon": 85.86,
+      "crop": "tomato",
+      "stage": "development",
+      "soil": "loam",
+      "area_m2": 1000,
+      "pump_lpm": 300,
+      "irrigation_method": "furrow",
+      "probes": [
+        {"raw_dry": 3000, "raw_field_capacity": 1300},
+        {"raw_dry": 3000, "raw_field_capacity": 1300}
+      ],
+      "contacts": [
+        {"name": "Farmer (Odia)", "whatsapp": "91XXXXXXXXXX", "language": "or"},
+        {"name": "Supervisor (English)", "whatsapp": "91YYYYYYYYYY", "language": "en"}
+      ],
+      "auto_pump": false,
+      "max_pump_minutes": 60,
+      "stale_after_hours": 3
+    }
+  ]
+}
