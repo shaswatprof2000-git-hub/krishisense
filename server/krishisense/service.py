@@ -17,22 +17,43 @@ MIN_PUMP_GAP_S = 12 * 3600          # never auto-run the pump twice within 12 h
 
 class Service:
     def __init__(self, stations: dict[str, Station], store: Store, notifier: Notifier,
-                 forecast_fn=weather.get_forecast):
+                 forecast_fn=weather.get_forecast, scenario=None):
+        """scenario: a simworld.WeatherScenario puts the server in simulation mode.
+        The clock then follows the stations' simulated timestamps and forecasts
+        come from the same simulated weather the virtual stations experience."""
         self.stations, self.store, self.notifier = stations, store, notifier
         self.forecast_fn = forecast_fn
+        self.scenario = scenario
+
+    @property
+    def simulated(self) -> bool:
+        return self.scenario is not None
+
+    def clock(self) -> float:
+        if self.simulated:
+            return self.store.latest_ts() or time.time()
+        return time.time()
 
     def evaluate(self, station: Station, now: float | None = None) -> Advice:
-        now = now or time.time()
+        now = now or self.clock()
         reading = self.store.latest_reading(station.station_id)
-        forecast = self.forecast_fn(station.lat, station.lon)
+        forecast = (self.scenario.forecast(now) if self.simulated
+                    else self.forecast_fn(station.lat, station.lon))
         temps = self.store.temp_range(station.station_id, now - 24 * 3600)
         adv = advise(station, reading, forecast, now=now, recent_temps=temps)
-        self.store.save_advice(adv)
+        self.store.save_advice(adv, ts=now)
         return adv
 
     def ingest(self, station: Station, payload: dict, now: float | None = None) -> dict:
-        now = now or time.time()
         added = 0
+        if now is None:
+            stamps = [float(r.get("ts") or 0) for r in payload.get("readings", [])]
+            if self.simulated and any(stamps):  # simulated time = newest reading in this upload
+                now = max(stamps)
+            elif self.simulated:
+                now = self.clock()
+            else:
+                now = time.time()
         for r in payload.get("readings", []):
             if not r.get("ts"):
                 r["ts"] = now
@@ -51,27 +72,37 @@ class Service:
         if last is not None and now - last < MIN_PUMP_GAP_S:
             return 0
         minutes = min(adv.pump_minutes, station.max_pump_minutes)
-        self.store.log_pump_command(station.station_id, minutes)
+        self.store.log_pump_command(station.station_id, minutes, ts=now)
         return minutes
 
     def maybe_alert(self, station: Station, adv: Advice, now: float, force: bool = False) -> int:
+        """Send WhatsApp alerts without spamming.
+
+        Readings near a threshold can make the advice flip between statuses every
+        15 minutes, so the rule is per status: the same warning goes out at most
+        once per REPEAT_AFTER_S, and "irrigate tomorrow" is suppressed while an
+        "irrigate now" alert is still fresh."""
         if not force:
             if adv.status not in ALERT_ON_CHANGE:
                 return 0
-            last = self.store.last_alert(station.station_id)
-            if last is not None and last["status"] == adv.status and now - last["sent_at"] < REPEAT_AFTER_S:
+            last_same = self.store.last_alert(station.station_id, adv.status)
+            if last_same is not None and now - last_same["sent_at"] < REPEAT_AFTER_S:
                 return 0
+            if adv.status == IRRIGATE_SOON:
+                last_now = self.store.last_alert(station.station_id, IRRIGATE_NOW)
+                if last_now is not None and now - last_now["sent_at"] < REPEAT_AFTER_S:
+                    return 0
         sent = 0
         for c in station.contacts:
             text = render(adv, station.name, c.language)
             if self.notifier.send(c.whatsapp, text):
-                self.store.log_alert(station.station_id, adv.status, c.whatsapp, text)
+                self.store.log_alert(station.station_id, adv.status, c.whatsapp, text, ts=now)
                 sent += 1
         return sent
 
     def daily_advisory(self, now: float | None = None) -> dict[str, Advice]:
         """Morning message to every contact, including 'all fine' days."""
-        now = now or time.time()
+        now = now or self.clock()
         out = {}
         for st in self.stations.values():
             adv = self.evaluate(st, now)
@@ -81,7 +112,7 @@ class Service:
 
     def check_all(self, now: float | None = None) -> dict[str, Advice]:
         """Hourly check: catches stations that went silent (no uploads -> no ingest)."""
-        now = now or time.time()
+        now = now or self.clock()
         out = {}
         for st in self.stations.values():
             adv = self.evaluate(st, now)

@@ -15,8 +15,8 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
@@ -25,3 +25,15 @@ jobs:
         run: pytest -q
       - name: Demo
         run: python -m krishisense demo
+      - name: Simulation (7 days, no server)
+        run: python -m krishisense sim --fast --days 7
+
+  simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Browser simulator logic
+        run: node docs/simulator.test.js

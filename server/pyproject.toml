@@ -19,3 +19,6 @@ krishisense = "krishisense.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["krishisense*"]
+
+[tool.setuptools.package-data]
+krishisense = ["*.html"]

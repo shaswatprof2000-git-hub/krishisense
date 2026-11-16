@@ -63,10 +63,10 @@ class Store:
             "AND air_temp_c IS NOT NULL", (station_id, since_s)).fetchone()
         return None if row[0] is None else (row[0], row[1])
 
-    def save_advice(self, a: Advice) -> None:
+    def save_advice(self, a: Advice, ts: float | None = None) -> None:
         with self.lock:
             self.conn.execute("INSERT INTO advice VALUES (?,?,?,?)",
-                              (a.station_id, time.time(), a.status, json.dumps(a.to_dict())))
+                              (a.station_id, ts or time.time(), a.status, json.dumps(a.to_dict())))
             self.conn.commit()
 
     def latest_advice(self, station_id: str) -> dict | None:
@@ -74,14 +74,19 @@ class Store:
                                 (station_id,)).fetchone()
         return None if row is None else json.loads(row[0])
 
-    def last_alert(self, station_id: str) -> sqlite3.Row | None:
-        return self.conn.execute("SELECT * FROM alerts WHERE station_id=? ORDER BY sent_at DESC LIMIT 1",
-                                 (station_id,)).fetchone()
+    def last_alert(self, station_id: str, status: str | None = None) -> sqlite3.Row | None:
+        if status is None:
+            return self.conn.execute("SELECT * FROM alerts WHERE station_id=? ORDER BY sent_at DESC LIMIT 1",
+                                     (station_id,)).fetchone()
+        return self.conn.execute(
+            "SELECT * FROM alerts WHERE station_id=? AND status=? ORDER BY sent_at DESC LIMIT 1",
+            (station_id, status)).fetchone()
 
-    def log_alert(self, station_id: str, status: str, recipient: str, text: str) -> None:
+    def log_alert(self, station_id: str, status: str, recipient: str, text: str,
+                  ts: float | None = None) -> None:
         with self.lock:
             self.conn.execute("INSERT INTO alerts VALUES (?,?,?,?,?)",
-                              (station_id, time.time(), status, recipient, text))
+                              (station_id, ts or time.time(), status, recipient, text))
             self.conn.commit()
 
     def last_pump_command(self, station_id: str) -> float | None:
@@ -89,10 +94,33 @@ class Store:
                                 (station_id,)).fetchone()
         return row[0]
 
-    def log_pump_command(self, station_id: str, minutes: int) -> None:
+    def log_pump_command(self, station_id: str, minutes: int, ts: float | None = None) -> None:
         with self.lock:
-            self.conn.execute("INSERT INTO pump_commands VALUES (?,?,?)", (station_id, time.time(), minutes))
+            self.conn.execute("INSERT INTO pump_commands VALUES (?,?,?)",
+                              (station_id, ts or time.time(), minutes))
             self.conn.commit()
+
+
+    # ---- queries for the dashboard ---------------------------------------------
+    def history(self, station_id: str, since_ts: float) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM readings WHERE station_id=? AND ts>=? ORDER BY ts", (station_id, since_ts)).fetchall()
+
+    def alerts(self, station_id: str | None = None, limit: int = 50) -> list[dict]:
+        q, args = "SELECT * FROM alerts", []
+        if station_id:
+            q += " WHERE station_id=?"
+            args.append(station_id)
+        q += " ORDER BY sent_at DESC LIMIT ?"
+        return [dict(r) for r in self.conn.execute(q, args + [limit]).fetchall()]
+
+    def pump_events(self, station_id: str, since_ts: float) -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM pump_commands WHERE station_id=? AND issued_at>=? ORDER BY issued_at",
+            (station_id, since_ts)).fetchall()]
+
+    def latest_ts(self) -> float | None:
+        return self.conn.execute("SELECT MAX(ts) FROM readings").fetchone()[0]
 
 
 def _to_reading(row) -> Reading:

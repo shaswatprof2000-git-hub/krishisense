@@ -4,6 +4,8 @@
 
 **A solar soil and weather station that tells farmers when to irrigate, and for how long, on WhatsApp in Odia, Hindi or English.**
 
+▶ **[Try the simulator in your browser](https://shaswatprof2000-git-hub.github.io/krishisense/)**: a season of KrishiSense advice vs a fixed watering schedule, no install.
+
 Farmers usually irrigate by habit or by looking at the soil surface. That often means too much water, too
 much diesel or electricity, and stressed crops when they guess wrong. KrishiSense measures soil moisture at
 two depths, checks the rain forecast, and sends one clear message each morning:
@@ -47,8 +49,43 @@ Crops included: tomato, brinjal, chilli, maize, groundnut, cabbage, potato, wate
 cd server
 pip install -e ".[dev]"
 python -m krishisense demo        # 12 simulated days: OK -> irrigate soon -> irrigate now -> skip for rain
-pytest -q                         # 26 tests
+pytest -q                         # 30 tests
 ```
+
+## Simulation: the whole system without hardware
+
+Build and test in three stages, so nothing is bought until the software is proven:
+
+| Stage | What runs | Command / tool |
+|---|---|---|
+| **1. Software simulation** | Virtual field stations + the real server + live dashboard | `python -m krishisense sim` |
+| **2. Virtual hardware** | The ESP32 firmware on a simulated board (Wokwi in VS Code) | roadmap |
+| **3. Real hardware** | Solar ESP32 station in the field | see [`hardware/`](hardware/README.md) |
+
+```bash
+cd server
+python -m krishisense sim                       # 30 simulated days, 1 hour per second; opens the dashboard
+python -m krishisense sim --days 14 --speed 7200 --rain 0.25
+python -m krishisense sim --fast                # no server or browser: just the season report
+```
+
+`sim` starts three virtual stations that behave like the real firmware. Each one sends the same JSON every
+15 minutes over HTTP, buffers readings when its network drops and uploads them later, and runs a battery
+model. Behind them is a simulated field: crop water use through the day, rain from a seeded weather
+scenario, and forecasts that are sometimes wrong, as real ones are.
+
+- **Tomato, loam, furrow:** the farmer reads the WhatsApp advice at 07:00 and follows it 9 times in 10.
+- **Groundnut, sandy loam, drip:** automatic pump control through the relay command.
+- **Chilli, silty clay loam, sprinkler:** the network is down for 12 hours on day 4, which tests the offline
+  buffer and the "no sensor data" alert.
+
+The server runs unchanged, in simulation mode: its clock follows the readings and it uses the scenario's
+forecast instead of Open-Meteo. The dashboard at `http://localhost:8080` shows each station's soil water,
+refill point, pump runs and the WhatsApp messages it would have sent. Nothing is sent to real phones.
+
+The [browser simulator](https://shaswatprof2000-git-hub.github.io/krishisense/) (`docs/index.html`) is a
+simplified JavaScript version of the same water balance and advice. Its KrishiSense farmer waters on the
+day the advice says so. Results from either simulator are illustrative, not field results.
 
 ## Run it for real
 
@@ -90,7 +127,11 @@ farmers to reply "OK" each morning. See `server/krishisense/notify.py`.
 | POST | `/api/v1/readings` | Device upload (header `X-Device-Key`). Returns `{"command": {"pump_minutes": n}}` |
 | GET | `/api/v1/advice?station_id=…` | Current advice as JSON |
 | GET | `/api/v1/readings?station_id=…&limit=100` | Recent readings |
-| GET | `/` | Status page |
+| GET | `/api/v1/stations` | All stations with current advice (used by the dashboard) |
+| GET | `/api/v1/history?station_id=…&days=7` | Soil water % over time |
+| GET | `/api/v1/pump?station_id=…` / `/api/v1/alerts` | Pump runs and alert log |
+| GET | `/` | Live dashboard |
+| GET | `/status` | Plain status table |
 
 The server uses only the Python standard library plus `requests`, so it runs on a Raspberry Pi.
 
@@ -98,12 +139,14 @@ The server uses only the Python standard library plus `requests`, so it runs on 
 
 - **Calibration lives on the server**, so the firmware sends raw values. Re-calibrating a probe never needs a re-flash.
 - **Offline first:** the station keeps 24 h of readings in RTC memory and uploads them when the network returns. The advisor still works without the forecast.
-- **Alerts don't spam:** a message goes out when the advice changes, repeats at most daily, and comes with a morning summary.
+- **Alerts don't spam:** each kind of alert goes out at most once in 20 hours, an "irrigate soon" is dropped if "irrigate now" was just sent, and there is one morning summary.
 - **Pump safety:** automatic pump control is off by default. When enabled, each run is capped and there must be at least 12 hours between runs. The farmer is always told the full water requirement.
 
 ## Roadmap
 
 - [ ] Field-test calibration and the advisor near Phulnakhara through one season. Compare water used vs. farmer's usual practice.
+- [x] Software simulation: virtual stations, simulation mode, live dashboard, browser simulator
+- [ ] Wokwi virtual ESP32 in VS Code, talking to the local server
 - [ ] Phase 2: pump relay + contactor, NPK sensor over RS485, LoRa for fields with no signal
 - [ ] Paddy mode: alternate wetting and drying (AWD) using a water-level sensor in a field tube
 - [ ] Voice messages in Odia for farmers who prefer audio

@@ -4,6 +4,9 @@
   advise  [--send]            print today's advice (and send WhatsApp with --send)
   check                       hourly check for silent stations (for cron)
   demo                        simulate a week of sensor data and show the advice + alerts
+  sim     [--days 30] [--speed 3600] [--port 8080] [--fast]
+                              full software simulation: server in simulation mode + 3 virtual
+                              field stations + live dashboard at http://127.0.0.1:8080
 """
 from __future__ import annotations
 
@@ -27,12 +30,22 @@ def main(argv=None):
     a = sub.add_parser("advise")
     a.add_argument("--send", action="store_true")
     sub.add_parser("check")
+    sm = sub.add_parser("sim")
+    sm.add_argument("--days", type=float, default=30)
+    sm.add_argument("--speed", type=float, default=3600, help="simulated seconds per real second")
+    sm.add_argument("--port", type=int, default=8080)
+    sm.add_argument("--seed", type=int, default=7)
+    sm.add_argument("--rain", type=float, default=0.15, help="share of rainy days")
+    sm.add_argument("--fast", action="store_true", help="no waiting: run to the end, print the report")
+    sm.add_argument("--keep-open", action="store_true", help="keep the dashboard running after the end")
     d = sub.add_parser("demo")
     d.add_argument("--days", type=int, default=12)
     args = ap.parse_args(argv)
 
     if args.cmd == "demo":
         return demo(args)
+    if args.cmd == "sim":
+        return sim(args)
 
     stations = load_stations(args.config)
     store = Store(args.db)
@@ -52,6 +65,72 @@ def main(argv=None):
                 print(st.name, adv.to_dict())
     elif args.cmd == "check":
         Service(stations, store, notifier_from_env()).check_all()
+
+
+def sim(args):
+    """Software simulation of the whole system, no hardware needed."""
+    import os
+    import tempfile
+    import threading
+    import time as _time
+
+    from .notify import ConsoleNotifier
+    from .server import serve
+    from .simworld import WeatherScenario
+    from .virtual_station import HttpTransport, InProcessTransport, demo_fields, demo_stations, run
+
+    class SilentNotifier(ConsoleNotifier):
+        def send(self, to, text):  # alerts are logged and shown on the dashboard instead
+            self.sent.append((to, text))
+            return True
+
+    scenario = WeatherScenario(seed=args.seed, rain_chance=args.rain)
+    stations = demo_stations()
+    db = os.path.join(tempfile.gettempdir(), "krishisense_sim.db")
+    if os.path.exists(db):
+        os.remove(db)
+    svc = Service({s.station_id: s for s in stations}, Store(db), SilentNotifier(), scenario=scenario)
+    fields = demo_fields(scenario, stations)
+    last_check = [0.0]
+
+    def on_tick(ts, _fields):
+        if ts - last_check[0] >= 3600:  # hourly silent-station check, like the cron job
+            svc.check_all(ts)
+            last_check[0] = ts
+
+    if args.fast:
+        t0 = _time.time()
+        report = run(fields, InProcessTransport(svc), days=args.days, on_tick=on_tick)
+        print(f"Simulated {args.days:g} days for {len(fields)} stations in {_time.time() - t0:.0f} s")
+    else:
+        httpd = serve(svc, "127.0.0.1", args.port)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{args.port}"
+        print(f"Dashboard: {url}   (simulating {args.days:g} days at {args.speed:g}x; Ctrl+C to stop)")
+        try:
+            import webbrowser
+            webbrowser.open(url)
+        except Exception:
+            pass
+        try:
+            report = run(fields, HttpTransport(url), days=args.days, speed=args.speed, on_tick=on_tick)
+        except KeyboardInterrupt:
+            report = [f.summary() for f in fields]
+    print()
+    for r in report:
+        print(f"{r['station']}\n   {r['crop']}, {r['soil']}, {r['mode']}\n"
+              f"   water used {r['water_m3']} m3 in {r['pump_runs']} pump runs | rain {r['rain_mm']} mm | "
+              f"crop stress {r['stress_hours']} h (severe {r['severe_stress_hours']} h) | "
+              f"max readings buffered offline {r['max_buffered_readings']}")
+    alerts = svc.store.alerts(limit=10000)
+    print(f"\nWhatsApp alerts logged: {len(alerts)} (both languages), database: {db}")
+    if not args.fast and args.keep_open:
+        print("Dashboard still running; Ctrl+C to quit.")
+        try:
+            while True:
+                _time.sleep(3600)
+        except KeyboardInterrupt:
+            pass
 
 
 def demo(args):

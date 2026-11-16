@@ -256,8 +256,9 @@ def test_http_ingest_auth_and_advice(running_server):
     assert adv["status"] == IRRIGATE_NOW
     rows = requests.get(f"{base}/api/v1/readings", params={"station_id": "s1"}).json()
     assert len(rows) == 1
-    page = requests.get(base + "/")
+    page = requests.get(base + "/status")
     assert page.status_code == 200 and "Test Field" in page.text
+    assert requests.get(base + "/").status_code == 200       # live dashboard
     assert requests.post(f"{base}/api/v1/readings", data="not json",
                          headers={"X-Device-Key": "secret"}).status_code == 400
 
