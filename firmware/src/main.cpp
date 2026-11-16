@@ -32,6 +32,14 @@
 #define PUMP_SECONDS_PER_MINUTE 60UL  // the simulator can speed pump runs up
 #endif
 
+// The Wokwi build stays awake between readings instead of deep-sleeping, unless
+// config.wokwi.h sets WOKWI_DEEP_SLEEP 1 (to test the simulator's deep sleep).
+#if defined(KS_WOKWI) && !(defined(WOKWI_DEEP_SLEEP) && WOKWI_DEEP_SLEEP)
+#define KS_STAY_AWAKE 1
+#else
+#define KS_STAY_AWAKE 0
+#endif
+
 #define FW_VERSION "0.1.0"
 #define BUFFER_SIZE 96            // 96 x 15 min = 24 h of offline storage
 #define VALID_EPOCH 1704067200UL  // 2024-01-01: anything earlier means "clock not set"
@@ -122,19 +130,43 @@ static void pushToBuffer(const Reading& r) {
 }
 
 static bool connectWifi() {
+  if (WiFi.status() == WL_CONNECTED) return true;  // stay-awake build: still connected
   WiFi.mode(WIFI_STA);
 #ifdef WIFI_CHANNEL
+  Serial.printf("Wi-Fi: connecting to \"%s\" on channel %d...\r\n", WIFI_SSID, WIFI_CHANNEL);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL);  // a fixed channel connects faster
 #else
+  Serial.printf("Wi-Fi: connecting to \"%s\"...\r\n", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 #endif
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_TIMEOUT_MS) delay(250);
-  if (WiFi.status() != WL_CONNECTED) return false;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.printf("Wi-Fi: not connected after %lu ms (status %d)\r\n",
+                  (unsigned long)(millis() - start), (int)WiFi.status());
+    return false;
+  }
+  Serial.printf("Wi-Fi: connected in %lu ms, IP %s, RSSI %d dBm\r\n", (unsigned long)(millis() - start),
+                WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
   configTime(19800, 0, "pool.ntp.org", "time.google.com");  // IST = UTC+5:30
   struct tm t;
-  getLocalTime(&t, 5000);
+  if (getLocalTime(&t, 5000)) {
+    char buf[32];
+    strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S", &t);
+    Serial.printf("Time: NTP sync OK, %s IST\r\n", buf);
+  } else {
+    Serial.println("Time: NTP sync failed after 5 s (readings get estimated timestamps)");
+  }
   return true;
+}
+
+static void wifiOff() {
+#if !KS_STAY_AWAKE
+  Serial.println("Wi-Fi: off");
+  Serial.flush();
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+#endif
 }
 
 static void addJsonNumber(JsonObject o, const char* key, float v) {
@@ -168,6 +200,7 @@ static int uploadBuffer() {
   String body;
   serializeJson(doc, body);
 
+  Serial.printf("Upload: %u reading(s) to %s\r\n", bufCount, SERVER_URL);
   HTTPClient http;
   http.begin(SERVER_URL);
   http.addHeader("Content-Type", "application/json");
@@ -182,8 +215,9 @@ static int uploadBuffer() {
     } else {
       pumpMinutes = 0;
     }
+    Serial.printf("Upload: HTTP 200, pump %d min\r\n", pumpMinutes);
   } else {
-    Serial.printf("Upload failed: HTTP %d\n", code);
+    Serial.printf("Upload failed: HTTP %d (%s)\r\n", code, http.errorToString(code).c_str());
   }
   http.end();
   return pumpMinutes;
@@ -193,32 +227,22 @@ static void runPump(int minutes) {
 #if ENABLE_PUMP_CONTROL
   if (minutes <= 0) return;
   if (minutes > MAX_PUMP_MINUTES) minutes = MAX_PUMP_MINUTES;
-  Serial.printf("Pump ON for %d min\n", minutes);
-  WiFi.disconnect(true);  // save power while waiting
-  WiFi.mode(WIFI_OFF);
+  Serial.printf("Pump ON for %d min\r\n", minutes);
+  wifiOff();  // save power while waiting
   pumpWrite(true);
   delay((uint32_t)minutes * PUMP_SECONDS_PER_MINUTE * 1000UL);
   pumpWrite(false);
   Serial.println("Pump OFF");
 #else
-  if (minutes > 0) Serial.printf("Server asked for %d pump minutes (pump control disabled)\n", minutes);
+  if (minutes > 0) Serial.printf("Server asked for %d pump minutes (pump control disabled)\r\n", minutes);
 #endif
 }
 
-void setup() {
-  pinMode(PIN_PUMP_RELAY, OUTPUT);
-  pumpWrite(false);  // always start with the pump OFF
-  pinMode(PIN_SENSOR_POWER, OUTPUT);
-  digitalWrite(PIN_SENSOR_POWER, LOW);
-  Serial.begin(115200);
-  delay(200);
-  analogReadResolution(12);
-  analogSetAttenuation(ADC_11db);
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-
+// One measurement cycle: read, buffer, try to upload, act on the pump command.
+static void cycle() {
   Reading r = takeReading();
   pushToBuffer(r);
-  Serial.printf("seq=%lu soil=%u/%u T=%.1fC RH=%.0f%% batt=%.2fV buffered=%u\n",
+  Serial.printf("seq=%lu soil=%u/%u T=%.1fC RH=%.0f%% batt=%.2fV buffered=%u\r\n",
                 (unsigned long)r.seq, r.soilTop, r.soilDeep, r.airTempC, r.humidity,
                 r.batteryV, bufCount);
 
@@ -235,11 +259,40 @@ void setup() {
     failedUploads++;
     Serial.println("Wi-Fi unavailable, reading kept in buffer");
   }
-
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_SECONDS * 1000000ULL);
-  esp_deep_sleep_start();
 }
 
+void setup() {
+  pinMode(PIN_PUMP_RELAY, OUTPUT);
+  pumpWrite(false);  // always start with the pump OFF
+  pinMode(PIN_SENSOR_POWER, OUTPUT);
+  digitalWrite(PIN_SENSOR_POWER, LOW);
+  Serial.begin(115200);
+  delay(200);
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Serial.printf("KrishiSense %s, station %s, wake cause %d\r\n", FW_VERSION, STATION_ID,
+                (int)esp_sleep_get_wakeup_cause());
+
+#if !KS_STAY_AWAKE
+  cycle();
+  wifiOff();
+  Serial.printf("Sleeping %lu s\r\n", (unsigned long)SLEEP_SECONDS);
+  Serial.flush();
+  esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_SECONDS * 1000000ULL);
+  esp_deep_sleep_start();
+#endif
+}
+
+#if KS_STAY_AWAKE
+// Wokwi build: same cycle, but the board stays awake and keeps Wi-Fi up between
+// readings, so the simulator never has to enter deep sleep.
+void loop() {
+  cycle();
+  Serial.printf("Next reading in %lu s (Wokwi build stays awake)\r\n", (unsigned long)SLEEP_SECONDS);
+  Serial.flush();
+  delay((uint32_t)SLEEP_SECONDS * 1000UL);
+}
+#else
 void loop() {}  // never reached: the station deep-sleeps between readings
+#endif

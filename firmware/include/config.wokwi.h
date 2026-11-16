@@ -16,6 +16,11 @@
 #define SLEEP_SECONDS     15
 #define WIFI_TIMEOUT_MS   15000
 
+// 0: stay awake between readings (loop + delay, Wi-Fi stays up). The simulator reset
+//    with TG1WDT_SYS_RESET on the way into deep sleep, right after a successful upload.
+// 1: use the real deep-sleep path, to test the simulator's deep sleep support.
+#define WOKWI_DEEP_SLEEP  0
+
 // The battery is a potentiometer on GPIO33 in the simulator.
 #define BATTERY_DIVIDER   1.3f
 
