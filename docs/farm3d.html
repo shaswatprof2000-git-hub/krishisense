@@ -3,446 +3,849 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KrishiSense · 3D farm</title>
-<meta name="description" content="KrishiSense in 3D: three simulated farms with solar soil stations, a Raspberry Pi gateway, pumps, rain and WhatsApp advice, running in your browser.">
+<title>KrishiSense twin</title>
+<meta name="description" content="A digital twin of three simulated farms in Odisha: solar soil sensors, a Raspberry Pi gateway, an FAO-56 irrigation advisor and WhatsApp advice, running in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Noto+Sans+Oriya:wght@400;600&display=swap" rel="stylesheet">
 <style>
-  :root { --ink:#0b0b0b; --muted:#8a8984; --good:#1a8a5c; --warn:#b47c00; --serious:#c4471f; --critical:#a3122b; --info:#2a78d6; }
+  :root {
+    --slate: #1f2b36; --slate-2: #2a3946; --slate-3: #364857;
+    --line: rgba(238, 241, 234, .13); --paper: #eef1ea; --mute: #a9b4ae; --faint: #77847e;
+    --canal: #5ab0e6; --paddy: #8ccb6a; --turmeric: #e8b931; --chilli: #e0533d; --laterite: #a4502f;
+    --panel: rgba(31, 43, 54, .86);
+    --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --odia: "Noto Sans Oriya", "Atkinson Hyperlegible", sans-serif;
+  }
   * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; overflow:hidden; background:#0d1520; font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); }
-  #scene { position:fixed; inset:0; }
-  .panel { position:fixed; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.18); }
-  #hud { top:14px; left:14px; padding:12px 14px; max-width:420px; }
-  #hud h1 { font-size:18px; margin:0; }
-  #hud .sub { color:#52514e; font-size:12.5px; margin:2px 0 8px; }
-  #clock { font-variant-numeric:tabular-nums; font-weight:600; }
-  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px; }
-  button { font:inherit; font-size:12.5px; border:1px solid #d9d8d2; background:#fff; color:var(--ink); padding:4px 10px; border-radius:999px; cursor:pointer; }
-  button.on, button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
-  a { color:var(--info); }
-  .nav { font-size:12.5px; margin-top:8px; }
-  #weather { font-size:12.5px; color:#52514e; margin-top:6px; }
-  #toast { right:14px; bottom:14px; width:340px; padding:10px 12px; }
-  #toast h2 { font-size:13px; margin:0 0 6px; color:#52514e; font-weight:600; }
-  .wa { background:#e7f6ec; border-radius:10px 10px 10px 2px; padding:7px 9px; font-size:13px; margin-top:6px; }
-  .wa .t { color:var(--muted); font-size:11px; margin-top:2px; }
-  #legend { left:14px; bottom:14px; padding:10px 12px; font-size:12px; color:#52514e; max-width:300px; }
-  .sw { display:inline-block; width:22px; height:9px; border-radius:3px; vertical-align:middle; margin-right:5px; }
-  .label { position:fixed; transform:translate(-50%,-100%); pointer-events:none; background:rgba(255,255,255,.93); border-radius:10px;
-           padding:5px 9px; font-size:12px; white-space:nowrap; box-shadow:0 3px 12px rgba(0,0,0,.2); }
-  .label b { font-size:12.5px; }
-  .label .st { font-weight:700; }
-  .label .bar { height:5px; background:#e6e5e0; border-radius:3px; margin-top:3px; overflow:hidden; }
-  .label .bar i { display:block; height:100%; background:var(--info); }
-  #loading { position:fixed; inset:0; display:grid; place-items:center; color:#fff; font-size:15px; text-align:center; padding:20px; }
-  @media (max-width:700px){ #toast{ width:auto; left:14px; } #legend{ display:none; } #hud{ right:14px; max-width:none; } }
+  html, body { margin: 0; height: 100%; }
+  body { background: #0f1820; color: var(--paper); font: 14px/1.45 var(--body); overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--canal); outline-offset: 2px; }
+  a { color: var(--canal); }
+
+  /* ---------- frame ---------- */
+  .app { position: fixed; inset: 0; display: grid; grid-template-columns: 252px minmax(0, 1fr) 340px;
+         grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: 10px; pointer-events: none; }
+  .app > * { pointer-events: auto; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; }
+  .panel { background: var(--panel); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+           border: 1px solid var(--line); border-radius: 16px; }
+
+  /* ---------- top bar ---------- */
+  .top { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 10px 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand h1 { font: 700 21px/1 var(--display); margin: 0; letter-spacing: -.01em; }
+  .brand .tag { color: var(--mute); font-size: 12.5px; }
+  .leaf { width: 26px; height: 26px; }
+  .season { display: grid; gap: 4px; min-width: 0; }
+  .season-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; min-width: 0; }
+  .season-head .wx { min-width: 0; }
+  .season-head b { font: 700 15px var(--display); font-variant-numeric: tabular-nums; }
+  .season-head .wx { color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scrub { position: relative; height: 26px; cursor: pointer; touch-action: none; }
+  .scrub .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; border-radius: 2px; background: var(--slate-3); }
+  .scrub .done { position: absolute; left: 0; top: 11px; height: 4px; border-radius: 2px; background: var(--canal); }
+  .scrub .knob { position: absolute; top: 5px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--paper);
+                 box-shadow: 0 0 0 4px rgba(90, 176, 230, .35); }
+  .scrub .rain { position: absolute; bottom: 0; width: 2px; border-radius: 1px; background: var(--canal); opacity: .7; }
+  .transport { display: flex; align-items: center; gap: 6px; }
+  .btn { border: 1px solid var(--line); background: var(--slate-2); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; }
+  .btn:hover { background: var(--slate-3); }
+  .btn.play { background: var(--paper); color: var(--slate); border-color: var(--paper); font-weight: 700; min-width: 76px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 12.5px; color: var(--mute); }
+  .seg button[aria-pressed="true"] { background: var(--slate-3); color: var(--paper); }
+
+  /* ---------- left rail ---------- */
+  .rail { grid-row: 2; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; padding: 12px; }
+  .rail h2, .insp h2 { font: 700 13.5px var(--display); margin: 0; color: var(--mute); }
+  .field { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 4px 10px; align-items: center; text-align: left; width: 100%;
+           padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; background: var(--slate-2); cursor: pointer; }
+  .field:hover { border-color: var(--line); }
+  .field[aria-current="true"] { border-color: var(--canal); background: #26405a; }
+  .field .nm { font-weight: 700; font-size: 13.5px; }
+  .field .meta { grid-column: 2; color: var(--mute); font-size: 12px; }
+  .ring { grid-row: span 2; }
+  .status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .spark { height: 26px; width: 100%; display: block; }
+  .layers { display: grid; gap: 2px; margin-top: 2px; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 2px; cursor: pointer; font-size: 13px; }
+  .toggle input { appearance: none; -webkit-appearance: none; width: 32px; height: 18px; border-radius: 9px; background: var(--slate-3); position: relative; cursor: pointer; margin: 0; flex: none; }
+  .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--mute); transition: transform .15s; }
+  .toggle input:checked { background: var(--canal); }
+  .toggle input:checked::after { transform: translateX(14px); background: #fff; }
+  .views { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rail .foot { margin-top: auto; color: var(--faint); font-size: 12px; }
+
+  /* ---------- inspector ---------- */
+  .insp { grid-row: 2; grid-column: 3; min-height: 0; overflow: auto; padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .insp-head h3 { font: 700 19px/1.15 var(--display); margin: 0 0 3px; }
+  .insp-head .sub { color: var(--mute); font-size: 12.5px; }
+  .verdict { border-radius: 12px; padding: 10px 12px; background: var(--slate-2); border-left: 4px solid var(--paddy); }
+  .verdict .what { font: 700 16px var(--display); }
+  .verdict .why { color: var(--mute); font-size: 12.5px; margin-top: 2px; }
+  .profile svg { width: 100%; height: auto; display: block; }
+  .facts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 8px; }
+  .fact .v { font: 700 17px var(--display); font-variant-numeric: tabular-nums; }
+  .fact .l { color: var(--mute); font-size: 11.5px; line-height: 1.3; }
+  .chart svg { width: 100%; height: auto; display: block; margin-top: 4px; }
+  .msg { background: #dff3e4; color: #13261b; border-radius: 12px 12px 12px 3px; padding: 9px 11px; font-size: 14px; }
+  .msg.or { font-family: var(--odia); }
+  .msg .t { color: #4f6b58; font-size: 11px; margin-top: 3px; font-family: var(--body); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  details.packet summary { cursor: pointer; color: var(--mute); font-size: 12.5px; }
+  details.packet pre { margin: 6px 0 0; padding: 9px 10px; background: #15202a; border-radius: 10px; font-size: 11.5px; overflow: auto; color: #cfe3d6; }
+
+  /* ---------- event stream ---------- */
+  .stream { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-width: 0; }
+  .stream h2 { font: 700 13px var(--display); margin: 0; color: var(--mute); white-space: nowrap; }
+  .events { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+  .ev { flex: none; display: flex; gap: 8px; align-items: center; background: var(--slate-2); border-radius: 999px; padding: 5px 12px 5px 6px;
+        font-size: 12.5px; cursor: pointer; border: 1px solid transparent; }
+  .ev:hover { border-color: var(--line); }
+  .ev .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; color: #10202c; font-weight: 700; }
+  .ev time { color: var(--faint); font-variant-numeric: tabular-nums; }
+  .ev.fresh { animation: arrive .6s ease-out; }
+  @keyframes arrive { from { background: #2f5878; } }
+
+  /* ---------- 3D overlays ---------- */
+  #tags { position: fixed; inset: 0; pointer-events: none; }
+  .tag3d { position: absolute; transform: translate(-50%, -100%); background: rgba(31, 43, 54, .9); border: 1px solid var(--line);
+           padding: 3px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+  .tag3d i { width: 8px; height: 8px; border-radius: 50%; }
+  #hover { position: fixed; pointer-events: none; background: var(--paper); color: var(--slate); border-radius: 8px; padding: 6px 9px;
+           font-size: 12.5px; transform: translate(12px, 12px); display: none; max-width: 260px; box-shadow: 0 6px 20px rgba(0,0,0,.35); z-index: 5; }
+  #note3d { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--mute); display: none; max-width: 360px; }
+
+  /* ---------- map view (also the offline fallback) ---------- */
+  #map { position: fixed; top: 92px; right: 360px; bottom: 72px; left: 272px; display: none; background: #2e4a2c; border-radius: 16px; overflow: hidden; }
+  #stage.map-bg { filter: blur(2px) brightness(.6); }
+  #map svg { width: 100%; height: 100%; display: block; }
+  #map .plot { cursor: pointer; }
+
+  /* ---------- help ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(9, 14, 19, .62); display: none; place-items: center; z-index: 10; padding: 20px; }
+  .scrim[open] { display: grid; }
+  .help { max-width: 860px; width: 100%; padding: 22px 24px; max-height: 90vh; overflow: auto; }
+  .help h2 { font: 700 24px var(--display); margin: 0 0 4px; }
+  .help .lede { color: var(--mute); margin: 0 0 18px; max-width: 64ch; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+  .step { background: var(--slate-2); border-radius: 12px; padding: 12px; }
+  .step::before { counter-increment: s; content: counter(s); font: 700 28px/1 var(--display); color: var(--canal); display: block; margin-bottom: 6px; }
+  .step h3 { font: 700 15px var(--display); margin: 0 0 4px; }
+  .step p { margin: 0; color: var(--mute); font-size: 13px; }
+  .step code { color: var(--paper); font-size: 12px; }
+  .keys { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; color: var(--mute); font-size: 13px; }
+  kbd { background: var(--slate-3); border-radius: 5px; padding: 1px 6px; font: 12px var(--body); color: var(--paper); }
+
+  @media (max-width: 1100px) { .app { grid-template-columns: 220px minmax(0, 1fr) 300px; } .facts { grid-template-columns: 1fr 1fr; } #map { left: 240px; right: 320px; } }
+  @media (max-width: 820px) {
+    body { overflow: auto; }
+    #stage, #map { top: 0; left: 0; right: 0; bottom: auto; height: 46vh; border-radius: 0; }
+    .app { position: relative; inset: auto; min-height: 100%; grid-template-columns: 1fr; grid-template-rows: auto; padding-top: calc(46vh + 10px); }
+    .top { grid-template-columns: 1fr; gap: 10px; }
+    .transport { flex-wrap: wrap; }
+    .season-head { flex-wrap: wrap; } .season-head .wx { white-space: normal; }
+    .seg button, .btn { white-space: nowrap; }
+    .rail, .insp, .stream { grid-column: 1; grid-row: auto; }
+    .steps { grid-template-columns: 1fr 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ev.fresh { animation: none; } }
 </style>
+</head>
+<body>
+<div id="stage" aria-label="3D view of the farms"></div>
+<div id="map" role="img" aria-label="Map of the three farms"></div>
+<div id="tags"></div>
+<div id="hover"></div>
+<div id="note3d"></div>
+
+<div class="app">
+  <header class="top panel">
+    <div class="brand">
+      <svg class="leaf" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 29c0-9 2-15 10-22-9 1-15 6-15 13 0 3 2 6 5 9z" fill="#8ccb6a"/><path d="M16 29c0-6-3-10-9-12 0 6 3 10 9 12z" fill="#5ab0e6"/></svg>
+      <div><h1>KrishiSense twin</h1><div class="tag">Three simulated farms near Phulnakhara, Odisha</div></div>
+    </div>
+    <div class="season">
+      <div class="season-head"><b id="clock">Day 1, 00:00</b><span class="wx" id="wx"></span></div>
+      <div class="scrub" id="scrub" role="slider" tabindex="0" aria-label="Season position, in days" aria-valuemin="1" aria-valuemax="60">
+        <div class="track"></div><div class="done" id="done"></div><div id="ticks"></div><div class="knob" id="knob"></div>
+      </div>
+    </div>
+    <div class="transport">
+      <button class="btn play" id="play">Pause</button>
+      <div class="seg" role="group" aria-label="Simulation speed">
+        <button data-speed="1" aria-pressed="false">1 hr/s</button><button data-speed="4" aria-pressed="true">4 hr/s</button><button data-speed="12" aria-pressed="false">12 hr/s</button>
+      </div>
+      <button class="btn" id="newwx" title="Run a new season with different weather">New weather</button>
+      <button class="btn" id="helpBtn" aria-haspopup="dialog">How it works</button>
+    </div>
+  </header>
+
+  <nav class="rail panel" aria-label="Fields and view options">
+    <h2>Fields</h2>
+    <div id="fields" style="display:grid;gap:8px"></div>
+    <h2 style="margin-top:6px">View</h2>
+    <div class="seg" role="group" aria-label="View mode" style="align-self:flex-start">
+      <button data-mode="3d" aria-pressed="true">3D</button><button data-mode="map" aria-pressed="false">Map</button>
+    </div>
+    <div class="views" id="presets">
+      <button class="btn" data-preset="overview">Whole farm</button>
+      <button class="btn" data-preset="gateway">Gateway</button>
+      <button class="btn" data-preset="low">Eye level</button>
+    </div>
+    <h2 style="margin-top:6px">Show</h2>
+    <div class="layers">
+      <label class="toggle">Soil moisture heatmap <input type="checkbox" data-layer="heat"></label>
+      <label class="toggle">Sensor data flow <input type="checkbox" data-layer="flow" checked></label>
+      <label class="toggle">Field labels <input type="checkbox" data-layer="labels" checked></label>
+      <label class="toggle">Rain and clouds <input type="checkbox" data-layer="weather" checked></label>
+    </div>
+    <div class="foot">Farms, weather and messages are simulated.<br><a href="./">Dashboard</a> · <a href="season.html">Season comparison</a> · <a href="https://github.com/shaswatprof2000-git-hub/krishisense">Code</a></div>
+  </nav>
+
+  <aside class="insp panel" id="insp" aria-label="Selected field"></aside>
+
+  <footer class="stream panel">
+    <h2>What just happened</h2>
+    <div class="events" id="events"></div>
+  </footer>
+</div>
+
+<div class="scrim" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="help panel">
+    <div class="row"><h2 id="helpTitle">How KrishiSense decides when to water</h2><button class="btn" id="helpClose">Close</button></div>
+    <p class="lede">Each field has a solar sensor station. Everything below runs in this page, the same way it runs on the real hardware and server.</p>
+    <div class="steps">
+      <div class="step"><h3>Measure</h3><p>An ESP32 reads two soil probes (15 cm and 30 cm), air temperature and battery every 15 minutes. If the network is down it keeps up to 96 readings in memory.</p></div>
+      <div class="step"><h3>Collect</h3><p>Readings travel over Wi-Fi or 4G to a gateway (a Raspberry Pi or any server), which stores them with the rain forecast.</p></div>
+      <div class="step"><h3>Decide</h3><p>FAO-56 water balance: the root zone stores <code>TAW</code>; stress starts once <code>RAW = p × TAW</code> is used. Crop use per day is <code>Kc × ET0</code>. Likely rain can cancel watering.</p></div>
+      <div class="step"><h3>Advise</h3><p>The farmer gets one WhatsApp message in Odia, Hindi or English with pump minutes. With an automatic pump, the relay runs it, capped for safety.</p></div>
+    </div>
+    <div class="keys"><span><kbd>Space</kbd> play or pause</span><span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> select a field</span><span><kbd>0</kbd> whole farm</span><span><kbd>←</kbd> <kbd>→</kbd> one hour back or forward</span><span><kbd>H</kbd> this help</span></div>
+  </div>
+</div>
+
+<script src="farm-engine.js"></script>
+<script>
+/* ======================================================================
+   Twin controller: simulation, time travel, events and every 2D panel.
+   Works on its own; the 3D view (module below) plugs in when three.js loads.
+   ====================================================================== */
+(() => {
+const SEASON = 60, DAY = 86400, STEP = KSFarm.STEP_S, EPOCH = KSFarm.SIM_EPOCH;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const COLOR = { OK: "#8ccb6a", IRRIGATE_SOON: "#e8b931", IRRIGATE_NOW: "#e0533d", SKIP_RAIN: "#5ab0e6", SENSOR_STALE: "#c084fc", NO_DATA: "#c084fc" };
+const WORD = { OK: "Soil OK", IRRIGATE_SOON: "Water tomorrow", IRRIGATE_NOW: "Water now", SKIP_RAIN: "Skip, rain due", SENSOR_STALE: "No sensor data", NO_DATA: "Waiting for data" };
+const SHORT = { "sim-tomato": "Tomato", "sim-groundnut": "Groundnut", "sim-chilli": "Chilli" };
+const MODE = { "sim-tomato": "The farmer follows the WhatsApp advice", "sim-groundnut": "The pump is switched automatically", "sim-chilli": "The network drops on day 5" };
+
+const T = window.Twin = {
+  farm: null, seed: 7, speed: 4, playing: true, selected: "sim-tomato", lang: "or", mode: "3d", has3d: false,
+  layers: { heat: false, flow: true, labels: true, weather: true },
+  events: [], listeners: {}, carry: 0,
+  on(ev, fn) { (this.listeners[ev] ||= []).push(fn); },
+  emit(ev, ...a) { (this.listeners[ev] || []).forEach(fn => fn(...a)); },
+  ids() { return this.farm.stations.map(s => s.station_id); },
+  pumpActive(id) { const f = this.farm.fields[id], p = f.pumps[f.pumps.length - 1];
+    return !!p && this.farm.ts >= p.issued_at && this.farm.ts < p.issued_at + p.minutes * 60; },
+};
+
+// ---------- simulation with event detection ----------
+let prev = {};
+function snapshot() {
+  const s = {};
+  for (const id of T.ids()) { const f = T.farm.fields[id]; s[id] = { pumps: f.pumps.length, online: f.online !== false }; }
+  s.alert = T.farm.alerts[0]; return s;
+}
+function pushEvent(e) { T.events.unshift(e); if (T.events.length > 80) T.events.pop(); T.newEvents = true; }
+function step() {
+  if (!T.farm.tick()) return false;
+  const now = T.farm.ts, h = KSFarm.simHour(now), w = T.farm.weather.day(KSFarm.simDay(now));
+  for (const id of T.ids()) {
+    const f = T.farm.fields[id], p = prev[id];
+    if (f.pumps.length > p.pumps) { const pu = f.pumps[f.pumps.length - 1];
+      pushEvent({ ts: now, id, kind: "pump", text: `${SHORT[id]}: pump on for ${pu.minutes} min (${pu.source === "farmer" ? "farmer" : "automatic"})` }); }
+    const online = f.online !== false;
+    if (!online && p.online) pushEvent({ ts: now, id, kind: "net", text: `${SHORT[id]}: network lost, saving readings` });
+    if (online && !p.online) pushEvent({ ts: now, id, kind: "net", text: `${SHORT[id]}: back online, ${f.lastUpload ? f.lastUpload.sent : "?"} readings sent at once` });
+  }
+  const fresh = [];
+  for (const a of T.farm.alerts) { if (a === prev.alert) break; if (a.recipient === "SIMULATED-en") fresh.push(a); }
+  fresh.reverse().forEach(a => pushEvent({ ts: a.sent_at, id: a.station_id, kind: "alert", status: a.status, text: `${SHORT[a.station_id]}: WhatsApp sent, ${WORD[a.status].toLowerCase()}` }));
+  if (Math.abs(h - 15) < 1e-6 && w.rain_mm > 0) pushEvent({ ts: now, id: null, kind: "rain", text: `Rain shower, ${w.rain_mm.toFixed(0)} mm` });
+  prev = snapshot();
+  return true;
+}
+function restart(seed) {
+  T.seed = seed; T.farm = new KSFarm.Farm({ seed, days: SEASON }); T.events = []; T.carry = 0;
+  prev = snapshot(); for (let i = 0; i < 4 * 30; i++) step();      // start on day 2, 06:00 with some history
+  drawTicks(); T.emit("restart"); render(true);
+}
+function seek(ts) {                                               // time travel: replay the season to any moment
+  ts = Math.max(EPOCH + STEP, Math.min(EPOCH + SEASON * DAY, ts));
+  if (ts < T.farm.ts) { T.farm = new KSFarm.Farm({ seed: T.seed, days: SEASON }); T.events = []; prev = snapshot(); T.emit("restart"); }
+  while (T.farm.ts + STEP <= ts && step());
+  T.carry = 0; render(true);
+}
+T.seek = seek;
+
+// ---------- formatting helpers ----------
+const fmt = ts => { const d = KSFarm.simDay(ts) + 1, h = KSFarm.simHour(ts), mm = Math.round((h % 1) * 60) % 60;
+  return `Day ${d}, ${String(Math.floor(h)).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; };
+const ringSvg = (pct, refill, color, size = 46) => {
+  const r = size / 2 - 5, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0)) / 100;
+  const rx = size / 2 + r * Math.sin((refill / 100) * 2 * Math.PI), ry = size / 2 - r * Math.cos((refill / 100) * 2 * Math.PI);
+  return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#364857" stroke-width="5"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"
+      stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+    <circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="2.4" fill="#eef1ea"/>
+    <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="12.5" font-weight="700" fill="#eef1ea">${pct == null ? "–" : Math.round(pct)}</text></svg>`;
+};
+const spark = (hist, refill) => {
+  if (hist.length < 2) return "";
+  const W = 200, H = 26, t0 = hist[0].ts, t1 = hist[hist.length - 1].ts, x = t => (t - t0) / Math.max(1, t1 - t0) * W, y = v => H - 2 - (H - 4) * Math.min(v, 110) / 110;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <line x1="0" x2="${W}" y1="${y(refill)}" y2="${y(refill)}" stroke="#e8b931" stroke-dasharray="3 3" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <path d="${hist.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.water_pct).toFixed(1)}`).join("")}" fill="none" stroke="#5ab0e6" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+};
+const refillOf = st => Math.round(100 * (1 - KSFarm.CROPS[st.crop][4]));
+
+// ---------- fields rail ----------
+function renderFields() {
+  const box = $("#fields");
+  if (!box.children.length) box.innerHTML = T.ids().map((id, i) =>
+    `<button class="field" data-id="${id}" title="Inspect the ${SHORT[id].toLowerCase()} field (key ${i + 1})"><span data-k="ring" class="ring"></span><span class="nm">${SHORT[id]}</span><span class="meta" data-k="st"></span><span data-k="spark" style="grid-column:1/-1"></span></button>`).join("");
+  for (const el of box.children) {
+    const id = el.dataset.id, adv = T.farm.api(`/api/v1/advice?station_id=${id}`), st = T.farm.stations.find(s => s.station_id === id);
+    const col = COLOR[adv.status];
+    el.setAttribute("aria-current", id === T.selected);
+    el.querySelector('[data-k="ring"]').innerHTML = ringSvg(adv.available_water_pct, refillOf(st), col);
+    el.querySelector('[data-k="st"]').innerHTML = `<span class="status" style="color:${col}"><i></i>${WORD[adv.status]}</span>${T.pumpActive(id) ? ", pump running" : ""}`;
+    el.querySelector('[data-k="spark"]').innerHTML = spark(T.farm.api(`/api/v1/history?station_id=${id}&days=2`), refillOf(st));
+  }
+}
+
+// ---------- inspector ----------
+function profileSvg(st, f, reading, knownPct) {
+  const W = 300, H = 240, top = 48, bot = 214, colX = 22, colW = 150;
+  const zr = KSFarm.CROPS[st.crop][3] * { initial: .4, development: .7, mid: 1, late: 1 }[st.stage];
+  const frac = Math.max(0, Math.min(1.1, (knownPct ?? 100 * f.avail / f.taw) / 100)), refill = 1 - KSFarm.CROPS[st.crop][4];
+  const yOf = fr => bot - (bot - top) * Math.min(fr, 1.05) / 1.05;
+  const waterTop = yOf(frac), refillY = yOf(refill), fullY = yOf(1);
+  const depthY = cm => top + (bot - top) * Math.min(cm / 100 / zr, 0.97);
+  const stressed = frac < refill;
+  const plants = Array.from({ length: 5 }, (_, i) => { const x = colX + 19 + i * 28, d = stressed ? 7 : 0;
+    return `<path d="M${x},${top} q-2,-14 ${-4 + d},-24 M${x},${top - 12} q8,-6 14,${-2 + d} M${x},${top - 8} q-9,-4 -13,${2 + d}" stroke="${stressed ? "#c9b54a" : "#8ccb6a"}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`; }).join("");
+  const roots = Array.from({ length: 5 }, (_, i) => { const x = colX + 19 + i * 28;
+    return `<path d="M${x},${top} q-4,${(bot - top) * .35} 3,${(bot - top) * .62} M${x},${top + 20} q10,18 14,${(bot - top) * .4}" stroke="#ead9bf" stroke-width="1.1" fill="none" opacity=".6"/>`; }).join("");
+  const probes = reading ? [[15, reading.soil_raw[0]], [30, reading.soil_raw[1]]].map(([cm, raw]) => { const y = depthY(cm);
+    return `<line x1="${colX + colW - 34}" x2="${colX + colW + 10}" y1="${y}" y2="${y}" stroke="#eef1ea" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${colX + colW + 12}" cy="${y}" r="3.5" fill="#eef1ea"/>
+      <text x="${colX + colW + 20}" y="${y - 2}" font-size="11.5" fill="#eef1ea" font-weight="700">Probe at ${cm} cm</text>
+      <text x="${colX + colW + 20}" y="${y + 12}" font-size="11" fill="#a9b4ae">raw reading ${raw}</text>`; }).join("") : "";
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Root zone cross-section: ${Math.round(frac * 100)} percent of plant-available water left">
+    <defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ab0e6"/><stop offset="1" stop-color="#2f6f9e"/></linearGradient>
+      <pattern id="soilp" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#7a3d24"/><circle cx="3" cy="4" r="1" fill="#93502f"/><circle cx="8" cy="8" r=".8" fill="#5f2e1a"/></pattern>
+      <clipPath id="colclip"><rect x="${colX}" y="${top}" width="${colW}" height="${bot - top}" rx="7"/></clipPath></defs>
+    ${plants}
+    <g clip-path="url(#colclip)">
+      <rect x="${colX}" y="${top}" width="${colW}" height="${bot - top}" fill="url(#soilp)"/>
+      <rect x="${colX}" y="${waterTop}" width="${colW}" height="${bot - waterTop}" fill="url(#wg)" opacity=".8"/>
+      ${roots}
+    </g>
+    <line x1="${colX - 6}" x2="${colX + colW + 4}" y1="${fullY}" y2="${fullY}" stroke="#eef1ea" stroke-width="1" opacity=".55"/>
+    <text x="${colX + colW - 5}" y="${fullY + 13}" text-anchor="end" font-size="10.5" fill="#eef1ea">full</text>
+    <line x1="${colX - 6}" x2="${colX + colW + 4}" y1="${refillY}" y2="${refillY}" stroke="#e8b931" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="${colX + 5}" y="${refillY - 5}" font-size="11.5" fill="#e8b931" font-weight="700">refill line</text>
+    <text x="${colX}" y="${bot + 18}" font-size="11" fill="#a9b4ae">Root zone, ${Math.round(zr * 100)} cm deep</text>
+    ${probes}
+    <text x="${colX + 10}" y="${bot - 12}" font-size="20" font-weight="700" fill="#fff">${Math.round(frac * 100)}%</text><text x="${colX + 10}" y="${bot - 34}" font-size="10.5" fill="#eaf4fb">water left</text>
+  </svg>`;
+}
+function chartSvg(st, hist, pumps, rainTimes) {
+  const W = 300, H = 120, L = 34, R = 4, Tp = 8, B = 18, now = T.farm.ts, t0 = now - 2 * DAY;
+  const x = t => L + (W - L - R) * (t - t0) / (2 * DAY), y = v => Tp + (H - Tp - B) * (1 - Math.min(v, 110) / 110);
+  let g = [0, 50, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#364857"/><text x="${L - 4}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#77847e">${v}%</text>`).join("");
+  for (const t of rainTimes) if (t > t0 && t < now) g += `<rect x="${x(t) - 4}" y="${Tp}" width="8" height="${H - Tp - B}" fill="#5ab0e6" opacity=".22"/>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(refillOf(st))}" y2="${y(refillOf(st))}" stroke="#e8b931" stroke-dasharray="4 3"/>`;
+  for (const p of pumps) if (p.issued_at >= t0) g += `<line x1="${x(p.issued_at)}" x2="${x(p.issued_at)}" y1="${Tp}" y2="${H - B}" stroke="#e8b931" stroke-width="2"/>`;
+  const pts = hist.filter(p => p.ts >= t0);
+  if (pts.length > 1) g += `<path d="${pts.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.water_pct).toFixed(1)}`).join("")}" fill="none" stroke="#5ab0e6" stroke-width="2" stroke-linejoin="round"/>`;
+  g += `<text x="${L}" y="${H - 4}" font-size="10" fill="#77847e">48 h ago</text><text x="${W - R}" y="${H - 4}" text-anchor="end" font-size="10" fill="#77847e">now</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Soil water over the last 48 hours; yellow lines are pump runs, blue bands are rain">${g}</svg>`;
+}
+let openPacket = false;
+function renderInspector() {
+  const id = T.selected, st = T.farm.stations.find(s => s.station_id === id), f = T.farm.fields[id];
+  const adv = T.farm.api(`/api/v1/advice?station_id=${id}`), reading = f.readings[f.readings.length - 1];
+  const hist = T.farm.api(`/api/v1/history?station_id=${id}&days=2`);
+  const rainTimes = []; for (let d = KSFarm.simDay(T.farm.ts) - 2; d <= KSFarm.simDay(T.farm.ts); d++) if (d >= 0 && T.farm.weather.day(d).rain_mm > 0) rainTimes.push(EPOCH + d * DAY + 15.5 * 3600);
+  const col = COLOR[adv.status], pumping = T.pumpActive(id);
+  const why = {
+    OK: adv.notes.find(n => n.startsWith("about")) ? `Enough water for now. ${adv.notes.find(n => n.startsWith("about")).replace("about", "About")}.` : "Enough water in the root zone.",
+    IRRIGATE_SOON: `Today's crop use (${adv.etc_mm_day} mm) will cross the refill line by tomorrow morning.`,
+    IRRIGATE_NOW: `The root zone is past the refill line. Pumping ${adv.pump_minutes} minutes fills it again.`,
+    SKIP_RAIN: `About ${adv.rain_next_24h_mm} mm of rain is likely (${adv.rain_prob_pct}% chance), which covers most of the need.`,
+    SENSOR_STALE: `No reading for ${Math.floor(adv.hours_since_reading)} hours. The station keeps saving readings until the network returns.`,
+    NO_DATA: "Waiting for the first reading." }[adv.status];
+  const text = KSFarm.render(adv, st.name, T.lang);
+  const lastAlert = T.farm.alerts.find(a => a.station_id === id && a.recipient === "SIMULATED-en");
+  const t = f.totals, det = $("#insp details"); if (det) openPacket = det.open;
+  $("#insp").innerHTML = `
+    <div class="insp-head"><h3>${SHORT[id]} field</h3>
+      <div class="sub">${st.crop[0].toUpperCase() + st.crop.slice(1)}, ${st.stage} stage, ${st.soil.replace(/_/g, " ")} soil, ${st.area_m2} m², ${st.irrigation_method}. ${MODE[id]}.</div></div>
+    <div class="verdict" style="border-left-color:${col}"><div class="what" style="color:${col}">${WORD[adv.status]}${adv.urgent ? ", urgent" : ""}${pumping ? ". Pump running now" : ""}</div><div class="why">${esc(why)}</div></div>
+    <div class="profile">${profileSvg(st, f, reading, hist.length ? hist[hist.length - 1].water_pct : null)}</div>
+    <div class="facts">${adv.taw_mm == null ? `
+      <div class="fact"><div class="v">${hist.length ? Math.round(hist[hist.length - 1].water_pct) : "–"}%</div><div class="l">water at the last reading</div></div>
+      <div class="fact"><div class="v">${f.buffer.length}</div><div class="l">readings waiting on the station</div></div>
+      <div class="fact"><div class="v">${Math.floor(adv.hours_since_reading || 0)} h</div><div class="l">since the server heard from it</div></div>` : `
+      <div class="fact"><div class="v">${adv.depletion_mm} mm</div><div class="l">used, of ${adv.taw_mm} mm the soil holds</div></div>
+      <div class="fact"><div class="v">${adv.raw_mm} mm</div><div class="l">can be used before stress</div></div>
+      <div class="fact"><div class="v">${adv.etc_mm_day} mm</div><div class="l">crop water use today</div></div>`}
+      <div class="fact"><div class="v">${(t.litres / 1000).toFixed(0)} m³</div><div class="l">pumped this season, ${t.pump_runs} runs</div></div>
+      <div class="fact"><div class="v">${t.stress_h.toFixed(0)} h</div><div class="l">spent below the refill line</div></div>
+      <div class="fact"><div class="v">${adv.battery_v ?? "–"} V</div><div class="l">station battery</div></div>
+    </div>
+    <div><h2>Soil water, last 48 hours</h2><div class="chart">${chartSvg(st, hist, f.pumps, rainTimes)}</div></div>
+    <div>
+      <div class="row"><h2>What the farmer reads</h2>
+        <div class="seg" role="group" aria-label="Message language">${[["or", "ଓଡ଼ିଆ"], ["hi", "हिन्दी"], ["en", "English"]].map(([l, n]) => `<button data-lang="${l}" aria-pressed="${T.lang === l}">${n}</button>`).join("")}</div></div>
+      <div class="msg ${T.lang}" style="margin-top:8px">${esc(text)}<div class="t">Advice right now${lastAlert ? `. Last alert went out on ${fmt(lastAlert.sent_at)}` : ""}</div></div>
+    </div>
+    <details class="packet"${openPacket ? " open" : ""}><summary>Last upload from the ESP32 station</summary><pre>${esc(f.lastUpload ? JSON.stringify({ station_id: f.lastUpload.station_id, fw: f.lastUpload.fw, readings: f.lastUpload.readings }, null, 1) : "No upload yet")}</pre></details>`;
+}
+
+// ---------- top bar and event stream ----------
+function drawTicks() {
+  let g = "";
+  for (let d = 0; d < SEASON; d++) { const w = T.farm.weather.day(d); if (w.rain_mm > 0) g += `<i class="rain" style="left:${(d + .6) / SEASON * 100}%;height:${4 + Math.min(10, w.rain_mm / 4)}px" title="Rain on day ${d + 1}"></i>`; }
+  $("#ticks").innerHTML = g;
+}
+function renderTop() {
+  const ts = T.farm.ts, p = (ts - EPOCH) / (SEASON * DAY) * 100, w = T.farm.weather.day(KSFarm.simDay(ts)), h = KSFarm.simHour(ts);
+  $("#clock").textContent = fmt(ts) + (T.farm.finished ? ", season complete" : "");
+  const sky = h < 5.5 || h > 18.5 ? "Night" : w.rain_mm > 0 && h >= 14.5 && h < 16.5 ? "Raining" : w.rain_mm > 0 ? "Clouds building, rain this afternoon" : "Sunny";
+  $("#wx").textContent = `${sky}, ${w.t_min.toFixed(0)} to ${w.t_max.toFixed(0)} °C. Forecast said ${w.forecast_rain_mm.toFixed(0)} mm at ${Math.round(w.forecast_prob_pct)}% chance.`;
+  $("#done").style.width = p + "%"; $("#knob").style.left = p + "%";
+  $("#scrub").setAttribute("aria-valuenow", KSFarm.simDay(ts) + 1);
+  $("#play").textContent = T.playing ? "Pause" : T.farm.finished ? "Replay" : "Play";
+}
+const ICON = { pump: ["#e8b931", "P"], net: ["#c084fc", "!"], alert: ["#8ccb6a", "W"], rain: ["#5ab0e6", "R"] };
+function renderStream() {
+  if (!T.newEvents && $("#events").children.length) return;
+  T.newEvents = false;
+  $("#events").innerHTML = T.events.length ? T.events.slice(0, 40).map((e, i) => { const [c, l] = ICON[e.kind];
+    return `<button class="ev${i < 1 ? " fresh" : ""}" data-id="${e.id || ""}"><span class="ic" style="background:${e.kind === "alert" ? COLOR[e.status] : c}">${l}</span>${esc(e.text)}<time>${fmt(e.ts)}</time></button>`; }).join("")
+    : `<span style="color:var(--faint)">Pump runs, WhatsApp alerts, rain and network drops appear here as the season runs.</span>`;
+}
+
+// ---------- map view (2D; also the offline fallback) ----------
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",");
+function renderMap() {
+  if (T.mode !== "map") return;
+  const pos = { "sim-tomato": [190, 330], "sim-groundnut": [480, 330], "sim-chilli": [770, 330] };
+  let g = `<rect width="960" height="600" fill="#2e4a2c"/><rect x="40" y="470" width="880" height="22" rx="4" fill="#a4502f"/>
+    <g transform="translate(450,150)"><rect width="60" height="44" rx="4" fill="#e9e2d3"/><path d="M-6,2 30,-22 66,2z" fill="#8e3b2c"/><text x="30" y="64" text-anchor="middle" font-size="13" fill="#eef1ea">Raspberry Pi gateway</text></g>`;
+  for (const id of T.ids()) {
+    const [cx, cy] = pos[id], f = T.farm.fields[id], frac = Math.max(0, Math.min(1, f.avail / f.taw)), stressed = frac < 1 - KSFarm.CROPS[f.st.crop][4];
+    const adv = T.farm.api(`/api/v1/advice?station_id=${id}`), sel = id === T.selected;
+    g += `<g class="plot" data-id="${id}" role="button" aria-label="${SHORT[id]} field">
+      <rect x="${cx - 125}" y="${cy - 85}" width="250" height="170" rx="10" fill="rgb(${mix([215, 185, 143], [79, 51, 30], frac)})" stroke="${sel ? "#5ab0e6" : "rgba(0,0,0,.2)"}" stroke-width="${sel ? 5 : 1}"/>
+      ${Array.from({ length: 6 }, (_, r) => `<line x1="${cx - 108}" x2="${cx + 108}" y1="${cy - 65 + r * 26}" y2="${cy - 65 + r * 26}" stroke="${stressed ? "#c9b54a" : "#3f8f3a"}" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 13"/>`).join("")}
+      ${T.pumpActive(id) ? `<rect x="${cx - 125}" y="${cy - 85}" width="250" height="170" rx="10" fill="#5ab0e6" opacity=".35"/>` : ""}
+      ${T.layers.flow && f.online !== false ? `<path d="M${cx + 108},${cy - 68} Q${(cx + 480) / 2},${cy - 230} 480,198" stroke="#7cf0a8" stroke-width="1.5" fill="none" stroke-dasharray="4 6" opacity=".75"/>` : ""}
+      <circle cx="${cx + 108}" cy="${cy - 68}" r="8" fill="${f.online === false ? "#e0533d" : "#8ccb6a"}" stroke="#fff" stroke-width="2"/>
+      <text x="${cx}" y="${cy + 112}" text-anchor="middle" font-size="17" font-weight="700" fill="#eef1ea">${SHORT[id]}, ${adv.available_water_pct ?? "–"}% water</text>
+      <text x="${cx}" y="${cy + 132}" text-anchor="middle" font-size="14" fill="${COLOR[adv.status]}">${WORD[adv.status]}${T.pumpActive(id) ? ", pump running" : ""}</text></g>`;
+  }
+  $("#map").innerHTML = `<svg viewBox="0 0 960 600" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
+}
+
+// ---------- render orchestration ----------
+let lastPanels = 0;
+function render(force) {
+  const now = performance.now();
+  renderTop();
+  if (force || now - lastPanels > 400) { lastPanels = now; renderFields(); renderInspector(); renderStream(); renderMap(); }
+}
+
+// ---------- interaction ----------
+function select(id) { if (!id || !T.farm.fields[id]) return; T.selected = id; T.emit("select", id); render(true); }
+T.select = select;
+function setPlaying(p) { T.playing = p; renderTop(); }
+function setMode(m) {
+  T.mode = m; document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m));
+  $("#map").style.display = m === "map" ? "block" : "none"; $("#stage").classList.toggle("map-bg", m === "map");
+  $("#tags").style.display = m === "3d" ? "block" : "none"; $("#presets").style.display = m === "3d" ? "flex" : "none";
+  $("#note3d").style.display = m === "3d" && !T.has3d ? "block" : "none"; render(true);
+}
+T.setMode = setMode;
+$("#fields").addEventListener("click", e => { const b = e.target.closest(".field"); if (b) select(b.dataset.id); });
+$("#map").addEventListener("click", e => { const p = e.target.closest(".plot"); if (p) select(p.dataset.id); });
+$("#events").addEventListener("click", e => { const b = e.target.closest(".ev"); if (b && b.dataset.id) select(b.dataset.id); });
+$("#insp").addEventListener("click", e => { const b = e.target.closest("[data-lang]"); if (b) { T.lang = b.dataset.lang; renderInspector(); } });
+$("#play").onclick = () => { if (T.farm.finished) { restart(T.seed); setPlaying(true); } else setPlaying(!T.playing); };
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => { T.speed = +b.dataset.speed;
+  document.querySelectorAll("[data-speed]").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => T.emit("preset", b.dataset.preset));
+document.querySelectorAll("[data-layer]").forEach(i => i.onchange = () => { T.layers[i.dataset.layer] = i.checked; T.emit("layer", i.dataset.layer, i.checked); render(true); });
+$("#newwx").onclick = () => restart(1 + Math.floor(Math.random() * 999));
+const help = $("#help");
+$("#helpBtn").onclick = () => { help.setAttribute("open", ""); $("#helpClose").focus(); };
+$("#helpClose").onclick = () => { help.removeAttribute("open"); $("#helpBtn").focus(); };
+help.onclick = e => { if (e.target === help) $("#helpClose").click(); };
+// season scrubber: drag to any moment
+const scrub = $("#scrub");
+const scrubTo = ev => { const r = scrub.getBoundingClientRect(), p = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); seek(EPOCH + p * SEASON * DAY); };
+let dragging = false, wasPlaying = true;
+scrub.addEventListener("pointerdown", e => { dragging = true; wasPlaying = T.playing; T.playing = false; scrub.setPointerCapture(e.pointerId); scrubTo(e); });
+scrub.addEventListener("pointermove", e => { if (dragging) scrubTo(e); });
+scrub.addEventListener("pointerup", () => { dragging = false; setPlaying(wasPlaying && !T.farm.finished); });
+scrub.addEventListener("keydown", e => { if (e.key === "ArrowRight") { seek(T.farm.ts + DAY); e.preventDefault(); } if (e.key === "ArrowLeft") { seek(T.farm.ts - DAY); e.preventDefault(); } });
+addEventListener("keydown", e => {
+  if (e.target.closest && (e.target.closest("input") || (e.target.closest("[role=slider]") && e.key.startsWith("Arrow")))) return;
+  if (e.key === " ") { e.preventDefault(); $("#play").click(); }
+  else if (["1", "2", "3"].includes(e.key)) select(T.ids()[+e.key - 1]);
+  else if (e.key === "0") T.emit("preset", "overview");
+  else if (e.key === "ArrowRight") seek(T.farm.ts + 3600);
+  else if (e.key === "ArrowLeft") seek(T.farm.ts - 3600);
+  else if (e.key.toLowerCase() === "h") help.hasAttribute("open") ? $("#helpClose").click() : $("#helpBtn").click();
+  else if (e.key === "Escape" && help.hasAttribute("open")) $("#helpClose").click();
+});
+
+// ---------- main loop ----------
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.2, (now - last) / 1000); last = now;
+  if (T.playing && !T.farm.finished) { T.carry += dt * T.speed * 3600; while (T.carry >= STEP && step()) T.carry -= STEP; }
+  if (T.farm.finished && T.playing) setPlaying(false);
+  render(false);
+  requestAnimationFrame(loop);
+}
+restart(7);
+requestAnimationFrame(loop);
+// if the 3D library has not arrived, switch to the map view and say why
+setTimeout(() => { if (!T.has3d) { $("#note3d").innerHTML = "The 3D view needs an internet connection to load its graphics library. The map view shows the same farms."; if (T.mode === "3d") setMode("map"); } }, 6000);
+})();
+</script>
+
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
 </script>
-</head>
-<body>
-<div id="scene"></div>
-<div id="loading">Loading the 3D farm…</div>
-<div id="labels"></div>
-
-<div id="hud" class="panel">
-  <h1>🌱 KrishiSense · 3D farm</h1>
-  <div class="sub">Three simulated fields near Phulnakhara. Solar sensor stations report every 15 minutes to a
-    Raspberry Pi gateway; the advisor decides when to water. Drag to orbit, scroll to zoom.</div>
-  <div>Simulated time: <span id="clock">–</span> · <span id="day"></span></div>
-  <div id="weather"></div>
-  <div class="row">
-    <button id="play" class="primary">⏸ Pause</button>
-    <button data-speed="0.5">30 min/s</button><button data-speed="2" class="on">2 h/s</button><button data-speed="6">6 h/s</button>
-    <button id="restart">↻ New weather</button>
-    <button id="spin">⟳ Auto-orbit</button>
-  </div>
-  <div class="nav"><a href="./">Live dashboard</a> · <a href="season.html">Season comparison</a> ·
-    <a href="https://github.com/shaswatprof2000-git-hub/krishisense">Source code</a></div>
-</div>
-
-<div id="legend" class="panel">
-  <div><span class="sw" style="background:linear-gradient(90deg,#d7b98f,#5a3a22)"></span>soil colour: dry → wet</div>
-  <div style="margin-top:3px"><span class="sw" style="background:linear-gradient(90deg,#c9b54a,#2f8f3a)"></span>crop colour: stressed → healthy</div>
-  <div style="margin-top:3px">🔵 water from the pump · 🟢 station LED = upload · 🔴 = no network</div>
-  <div style="margin-top:3px">Glowing dots = readings travelling to the Raspberry Pi gateway</div>
-  <div style="margin-top:6px;color:#8a8984">Simulated, illustrative farms and weather.</div>
-</div>
-
-<div id="toast" class="panel"><h2>Latest WhatsApp alerts</h2><div id="msgs"><div class="wa">No alerts yet</div></div></div>
-
-<script src="farm-engine.js"></script>
 <script type="module">
+/* ======================================================================
+   3D view: reads the twin's state every frame; changes it only through
+   Twin.select() when a field is clicked.
+   ====================================================================== */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+const T = window.Twin;
+const host = document.getElementById("stage");
 
-const $ = s => document.querySelector(s);
-const SEASON_DAYS = 60;
-const fmtTime = ts => new Date(ts * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const STATUS = { OK: ["✅ Soil OK", "var(--good)"], IRRIGATE_SOON: ["⏰ Irrigate tomorrow", "var(--warn)"],
-  IRRIGATE_NOW: ["💧 Irrigate now", "var(--serious)"], SKIP_RAIN: ["🌧️ Skip: rain due", "var(--info)"],
-  SENSOR_STALE: ["⚠️ No data", "var(--critical)"], NO_DATA: ["⚠️ No data yet", "var(--critical)"] };
-
-// ---------------------------------------------------------------- renderer, scene, camera
-const host = $("#scene");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setSize(host.clientWidth || innerWidth, host.clientHeight || innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 host.appendChild(renderer.domElement);
-$("#loading").remove();
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xbfd8ee, 90, 230);
-const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 600);
-camera.position.set(-38, 34, 58);
+scene.fog = new THREE.Fog(0xbfd8ee, 100, 260);
+const camera = new THREE.PerspectiveCamera(42, (host.clientWidth || innerWidth) / (host.clientHeight || innerHeight), 0.5, 700);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, 2);
-controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.47; controls.minDistance = 18; controls.maxDistance = 150;
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.48; controls.minDistance = 10; controls.maxDistance = 170;
 
 const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5b4a33, 0.8); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2dc, 2.4);
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 260 });
-sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -0.0004; scene.add(sun); scene.add(sun.target);
+Object.assign(sun.shadow.camera, { left: -75, right: 75, top: 75, bottom: -75, near: 1, far: 280 });
+sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -0.0004;
+scene.add(sun, sun.target);
 
-// sky dome with a vertical gradient
 const skyU = { top: { value: new THREE.Color(0x4f8fd6) }, bottom: { value: new THREE.Color(0xdcebf7) } };
-const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(420, 32, 16), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
   vertexShader: "varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
-  fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying float h; void main(){ gl_FragColor = vec4(mix(bottom, top, clamp(h*1.6,0.0,1.0)),1.0); }" }));
-scene.add(sky);
-const stars = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(
-  Array.from({ length: 1800 }, (_, i) => { const t = Math.random() * Math.PI * 2, p = Math.random() * 0.45 * Math.PI, r = 380;
-    return i % 3 === 0 ? r * Math.cos(p) * Math.cos(t) : i % 3 === 1 ? r * Math.sin(p) + 10 : r * Math.cos(p) * Math.sin(t); }), 3)),
-  new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false }));
+  fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying float h; void main(){ gl_FragColor = vec4(mix(bottom, top, clamp(h*1.6,0.0,1.0)),1.0); }" })));
+const starPos = []; for (let i = 0; i < 700; i++) { const t = Math.random() * Math.PI * 2, p = 0.08 + Math.random() * 1.3, r = 400;
+  starPos.push(r * Math.cos(p) * Math.cos(t), r * Math.sin(p), r * Math.cos(p) * Math.sin(t)); }
+const stars = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(starPos, 3)),
+  new THREE.PointsMaterial({ color: 0xffffff, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0, fog: false }));
 scene.add(stars);
-const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c4, fog: false }));
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(10, 24, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c4, fog: false }));
 scene.add(sunDisc);
+const clouds = new THREE.Group(); scene.add(clouds);
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0, roughness: 1, flatShading: true, depthWrite: false });
+for (let i = 0; i < 9; i++) { const c = new THREE.Group();
+  for (let k = 0; k < 5; k++) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(4 + Math.random() * 3, 1), cloudMat); m.position.set(k * 5 - 10, Math.random() * 2, Math.random() * 4); c.add(m); }
+  c.position.set(-90 + i * 22, 38 + Math.random() * 8, -40 + Math.random() * 80); clouds.add(c); }
 
-// ---------------------------------------------------------------- terrain
-const grassGeo = new THREE.PlaneGeometry(320, 320, 80, 80); grassGeo.rotateX(-Math.PI / 2);
+// ---------- terrain ----------
+const grassGeo = new THREE.PlaneGeometry(340, 340, 90, 90); grassGeo.rotateX(-Math.PI / 2);
 { const pos = grassGeo.attributes.position, col = [];
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i), d = Math.hypot(x, z);
-    pos.setY(i, d > 60 ? Math.sin(x * 0.05) * Math.cos(z * 0.04) * Math.min(6, (d - 60) * 0.08) - 0.05 : -0.05);
-    const g = 0.45 + 0.12 * Math.sin(x * 0.3 + z * 0.17) + 0.06 * Math.random();
-    col.push(0.25 * g, 0.55 * g, 0.18 * g);
-  }
+  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i), d = Math.hypot(x, z * 1.3);
+    pos.setY(i, d > 64 ? Math.sin(x * 0.05) * Math.cos(z * 0.04) * Math.min(7, (d - 64) * 0.09) - 0.05 : -0.05);
+    const g = 0.46 + 0.12 * Math.sin(x * 0.3 + z * 0.17) + 0.07 * Math.random(); col.push(0.27 * g, 0.55 * g, 0.2 * g); }
   grassGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); grassGeo.computeVertexNormals(); }
 const grass = new THREE.Mesh(grassGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
 grass.receiveShadow = true; scene.add(grass);
-
-// a pond and a few trees for context
-const pond = new THREE.Mesh(new THREE.CircleGeometry(9, 40), new THREE.MeshStandardMaterial({ color: 0x3d7fb0, roughness: 0.15, metalness: 0.1 }));
-pond.rotation.x = -Math.PI / 2; pond.position.set(44, 0.02, -26); scene.add(pond);
-function tree(x, z, s = 1) {
-  const g = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * s, 0.5 * s, 4 * s, 8), new THREE.MeshStandardMaterial({ color: 0x6b4a2b }));
-  trunk.position.y = 2 * s; trunk.castShadow = true; g.add(trunk);
-  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.6 * s, 1), new THREE.MeshStandardMaterial({ color: 0x2f6b2f, flatShading: true }));
-  crown.position.y = 5.2 * s; crown.castShadow = true; g.add(crown);
+const pond = new THREE.Mesh(new THREE.CircleGeometry(10, 48), new THREE.MeshStandardMaterial({ color: 0x3d7fb0, roughness: 0.12, metalness: 0.2 }));
+pond.rotation.x = -Math.PI / 2; pond.position.set(50, 0.02, -30); scene.add(pond);
+const road = new THREE.Mesh(new THREE.PlaneGeometry(130, 5), new THREE.MeshStandardMaterial({ color: 0xa4502f, roughness: 1 }));
+road.rotation.x = -Math.PI / 2; road.position.set(0, 0.015, 21); road.receiveShadow = true; scene.add(road);   // laterite road
+function tree(x, z, s = 1, palm = false) {
+  const g = new THREE.Group(), trunkH = palm ? 9 * s : 4 * s;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * s, 0.45 * s, trunkH, 7), new THREE.MeshStandardMaterial({ color: 0x6b4a2b }));
+  trunk.position.y = trunkH / 2; trunk.castShadow = true; g.add(trunk);
+  if (palm) { for (let k = 0; k < 7; k++) { const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.6 * s, 5 * s, 4), new THREE.MeshStandardMaterial({ color: 0x3f7a2e, flatShading: true }));
+      leaf.position.set(0, trunkH, 0); leaf.rotation.set(1.9, (k / 7) * Math.PI * 2, 0, "YXZ"); leaf.translateY(2.2 * s); leaf.castShadow = true; g.add(leaf); } }
+  else { const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.7 * s, 1), new THREE.MeshStandardMaterial({ color: 0x2f6b2f, flatShading: true }));
+    crown.position.y = 5.4 * s; crown.castShadow = true; g.add(crown); }
   g.position.set(x, 0, z); scene.add(g);
 }
-[[-52, -30, 1.3], [-46, -36, 1], [52, 14, 1.2], [58, 22, 1], [-60, 18, 1.1], [30, -44, 1.4], [-20, -46, 1.2], [8, 44, 1]].forEach(a => tree(...a));
+[[-56, -30, 1.3], [-48, -38, 1], [58, 12, 1.2], [-64, 16, 1.1], [30, -48, 1.4], [-22, -50, 1.2], [10, 46, 1], [64, -8, 1, true], [60, -46, 1.1, true], [-70, -6, 1, true], [40, 40, 0.9, true]].forEach(a => tree(...a));
 
-// dirt track
-const track = new THREE.Mesh(new THREE.PlaneGeometry(6, 120), new THREE.MeshStandardMaterial({ color: 0xa48a63, roughness: 1 }));
-track.rotation.x = -Math.PI / 2; track.position.set(0, 0.01, 22); track.rotation.z = Math.PI / 2; track.receiveShadow = true; scene.add(track);
-
-// ---------------------------------------------------------------- farm data
-let farm, seed = 7, speed = 2, playing = true, carry = 0, spin = false;
+// ---------- plots ----------
 const PLOT_W = 22, PLOT_D = 16;
 const LAYOUT = { "sim-tomato": [-26, 0], "sim-groundnut": [0, 0], "sim-chilli": [26, 0] };
-const CROP_STYLE = {
-  tomato:    { h: 1.6, leaf: 0.55, fruit: 0xd8342a, fruitN: 3, rows: 7, perRow: 11 },
+const STYLE = { tomato: { h: 1.6, leaf: 0.55, fruit: 0xd8342a, fruitN: 3, rows: 7, perRow: 11 },
   groundnut: { h: 0.6, leaf: 0.5, fruit: null, fruitN: 0, rows: 9, perRow: 14 },
-  chilli:    { h: 1.1, leaf: 0.42, fruit: 0xc81e1e, fruitN: 4, rows: 8, perRow: 13 } };
-const DRY = new THREE.Color(0xd7b98f), WET = new THREE.Color(0x4f331e);
-const SICK = new THREE.Color(0xc9b54a), HEALTHY = new THREE.Color(0x2f8f3a);
-
-// gateway hut (Raspberry Pi) behind the plots
-const GATEWAY = new THREE.Vector3(0, 0, -20);
-{ const g = new THREE.Group();
-  const hut = new THREE.Mesh(new THREE.BoxGeometry(6, 3.6, 4.5), new THREE.MeshStandardMaterial({ color: 0xe9e2d3 }));
-  hut.position.y = 1.8; hut.castShadow = hut.receiveShadow = true; g.add(hut);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(4.8, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x8e3b2c, flatShading: true }));
-  roof.position.y = 4.7; roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof);
-  const pi = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.25, 1.1), new THREE.MeshStandardMaterial({ color: 0x1f7a3a, roughness: 0.6 }));
-  pi.position.set(0, 1.2, 2.3); g.add(pi);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.6 }));
-  mast.position.set(2.2, 6, -1.2); g.add(mast);
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8), new THREE.MeshStandardMaterial({ color: 0xff5a36, emissive: 0xff5a36, emissiveIntensity: 1.5 }));
-  tip.position.set(2.2, 9.1, -1.2); g.add(tip);
-  g.position.copy(GATEWAY); scene.add(g);
-  GATEWAY.set(GATEWAY.x + 2.2, 9, GATEWAY.z - 1.2);
-}
+  chilli: { h: 1.1, leaf: 0.42, fruit: 0xc81e1e, fruitN: 4, rows: 8, perRow: 13 } };
+const DRY = new THREE.Color(0xd7b98f), WET = new THREE.Color(0x4f331e), SICK = new THREE.Color(0xc9b54a), HEALTHY = new THREE.Color(0x2f8f3a);
+const pickables = [];
+const GATEWAY = new THREE.Vector3(2.2, 9.1, -21.2);
+{ const g = new THREE.Group(); g.position.set(0, 0, -20);
+  const hut = new THREE.Mesh(new THREE.BoxGeometry(6, 3.6, 4.5), new THREE.MeshStandardMaterial({ color: 0xe9e2d3 })); hut.position.y = 1.8; hut.castShadow = hut.receiveShadow = true; g.add(hut);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(4.8, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x8e3b2c, flatShading: true })); roof.position.y = 4.7; roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof);
+  const pi = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.25, 1.1), new THREE.MeshStandardMaterial({ color: 0x1f7a3a })); pi.position.set(0, 1.2, 2.3); g.add(pi);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.6 })); mast.position.set(2.2, 6, -1.2); g.add(mast);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), new THREE.MeshStandardMaterial({ color: 0xff7a4a, emissive: 0xff7a4a, emissiveIntensity: 1.5 })); tip.position.set(2.2, 9.1, -1.2); g.add(tip);
+  g.traverse(o => { if (o.isMesh) { o.userData.pick = "gateway"; pickables.push(o); } });
+  scene.add(g); }
 
 const plots = {};
+function heatTexture() { const c = document.createElement("canvas"); c.width = 44; c.height = 32; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
 function buildPlot(st) {
-  const [cx, cz] = LAYOUT[st.station_id], style = CROP_STYLE[st.crop], g = new THREE.Group();
-  g.position.set(cx, 0, cz);
+  const id = st.station_id, [cx, cz] = LAYOUT[id], style = STYLE[st.crop], g = new THREE.Group(); g.position.set(cx, 0, cz);
   const soilMat = new THREE.MeshStandardMaterial({ color: DRY.clone(), roughness: 0.95 });
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(PLOT_W, 0.5, PLOT_D), soilMat);
-  bed.position.y = 0.25; bed.receiveShadow = true; g.add(bed);
-  // ridges between rows
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(PLOT_W, 0.5, PLOT_D), soilMat); bed.position.y = 0.25; bed.receiveShadow = true; g.add(bed);
+  const heat = new THREE.Mesh(new THREE.PlaneGeometry(PLOT_W, PLOT_D), new THREE.MeshBasicMaterial({ map: heatTexture(), transparent: true, opacity: 0.85, depthWrite: false }));
+  heat.rotation.x = -Math.PI / 2; heat.position.y = 0.95; heat.visible = T.layers.heat; heat.renderOrder = 2; g.add(heat);
   const ridgeGeo = new THREE.BoxGeometry(PLOT_W - 1, 0.35, 0.5);
-  for (let r = 0; r <= style.rows; r++) {
-    const ridge = new THREE.Mesh(ridgeGeo, soilMat); ridge.position.set(0, 0.6, -PLOT_D / 2 + 1 + r * (PLOT_D - 2) / style.rows);
-    ridge.receiveShadow = true; g.add(ridge);
-  }
-  // furrow water (tomato) / drip lines (groundnut) / sprinkler heads (chilli)
-  const waterMat = new THREE.MeshStandardMaterial({ color: 0x3a8fd6, transparent: true, opacity: 0, roughness: 0.1, metalness: 0.1 });
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(PLOT_W - 1.2, PLOT_D - 1.2), waterMat);
-  water.rotation.x = -Math.PI / 2; water.position.y = 0.56; g.add(water);
-  if (st.irrigation_method === "drip") {
-    const pipeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
-    for (let r = 0; r < style.rows; r++) {
-      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, PLOT_W - 2, 6), pipeMat);
-      pipe.rotation.z = Math.PI / 2; pipe.position.set(0, 0.62, -PLOT_D / 2 + 1 + (r + 0.5) * (PLOT_D - 2) / style.rows); g.add(pipe);
-    }
-  }
+  for (let r = 0; r <= style.rows; r++) { const ridge = new THREE.Mesh(ridgeGeo, soilMat); ridge.position.set(0, 0.6, -PLOT_D / 2 + 1 + r * (PLOT_D - 2) / style.rows); ridge.receiveShadow = true; g.add(ridge); }
+  const waterMat = new THREE.MeshStandardMaterial({ color: 0x3a8fd6, transparent: true, opacity: 0, roughness: 0.08, metalness: 0.2 });
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(PLOT_W - 1.2, PLOT_D - 1.2), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = 0.56; g.add(water);
+  if (st.irrigation_method === "drip") { const pm = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+    for (let r = 0; r < style.rows; r++) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, PLOT_W - 2, 6), pm); p.rotation.z = Math.PI / 2; p.position.set(0, 0.62, -PLOT_D / 2 + 1 + (r + 0.5) * (PLOT_D - 2) / style.rows); g.add(p); } }
   const heads = [];
-  if (st.irrigation_method === "sprinkler") {
-    for (const [hx, hz] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) {
-      const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0x777777 }));
-      riser.position.set(hx, 1.3, hz); g.add(riser); heads.push(new THREE.Vector3(cx + hx, 2.2, cz + hz));
-    }
-  }
-  // crops: instanced stems + leaf clusters + fruit
+  if (st.irrigation_method === "sprinkler") for (const [hx, hz] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) {
+    const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0x777777 })); riser.position.set(hx, 1.3, hz); g.add(riser);
+    heads.push(new THREE.Vector3(cx + hx, 2.2, cz + hz)); }
   const n = style.rows * style.perRow;
   const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.08, 1, 5), new THREE.MeshStandardMaterial({ color: 0x4b6b2a }), n);
   const leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.8 }), n);
-  const fruitN = n * style.fruitN;
-  const fruits = fruitN ? new THREE.InstancedMesh(new THREE.SphereGeometry(st.crop === "chilli" ? 0.09 : 0.14, 8, 6),
-    new THREE.MeshStandardMaterial({ color: style.fruit, roughness: 0.4 }), fruitN) : null;
-  leaves.castShadow = true; stems.castShadow = true;
-  const plants = [], rnd = (() => { let s = st.station_id.length * 99; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
-  for (let r = 0; r < style.rows; r++) for (let k = 0; k < style.perRow; k++) {
-    const x = -PLOT_W / 2 + 1.4 + k * (PLOT_W - 2.8) / (style.perRow - 1) + (rnd() - 0.5) * 0.3;
-    const z = -PLOT_D / 2 + 1 + (r + 0.5) * (PLOT_D - 2) / style.rows + (rnd() - 0.5) * 0.2;
-    plants.push({ x, z, s: 0.85 + rnd() * 0.3, rot: rnd() * Math.PI * 2, fruit: Array.from({ length: style.fruitN }, () => [rnd() - 0.5, rnd(), rnd() - 0.5]) });
-  }
+  const fruits = style.fruitN ? new THREE.InstancedMesh(new THREE.SphereGeometry(st.crop === "chilli" ? 0.09 : 0.14, 8, 6), new THREE.MeshStandardMaterial({ color: style.fruit, roughness: 0.4 }), n * style.fruitN) : null;
+  stems.castShadow = leaves.castShadow = true;
+  const plants = []; let s = id.length * 99; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let r = 0; r < style.rows; r++) for (let k = 0; k < style.perRow; k++)
+    plants.push({ x: -PLOT_W / 2 + 1.4 + k * (PLOT_W - 2.8) / (style.perRow - 1) + (rnd() - 0.5) * 0.3, z: -PLOT_D / 2 + 1 + (r + 0.5) * (PLOT_D - 2) / style.rows + (rnd() - 0.5) * 0.2,
+      s: 0.85 + rnd() * 0.3, rot: rnd() * Math.PI * 2, fruit: Array.from({ length: style.fruitN }, () => [rnd() - 0.5, rnd(), rnd() - 0.5]) });
   g.add(stems, leaves); if (fruits) g.add(fruits);
-  // sensor station: pole, solar panel, enclosure, LED, probes
-  const station = new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.7, roughness: 0.35 });
+  const station = new THREE.Group(), metal = new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.7, roughness: 0.35 });
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 4, 8), metal); pole.position.y = 2; pole.castShadow = true; station.add(pole);
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.2), new THREE.MeshStandardMaterial({ color: 0x1b2f5e, metalness: 0.5, roughness: 0.25 }));
-  panel.position.set(0, 4.1, 0); panel.rotation.x = -0.35; panel.castShadow = true; station.add(panel);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), new THREE.MeshStandardMaterial({ color: 0xf4f4f0 }));
-  box.position.set(0, 2.4, 0.32); box.castShadow = true; station.add(box);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.2), new THREE.MeshStandardMaterial({ color: 0x1b2f5e, metalness: 0.5, roughness: 0.25 })); panel.position.set(0, 4.1, 0); panel.rotation.x = -0.35; panel.castShadow = true; station.add(panel);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), new THREE.MeshStandardMaterial({ color: 0xf4f4f0 })); box.position.set(0, 2.4, 0.32); box.castShadow = true; station.add(box);
   const ledMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0 });
-  const led = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), ledMat); led.position.set(0.25, 2.75, 0.58); station.add(led);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), ledMat); led.position.set(0.25, 2.75, 0.58); station.add(led);
   const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 5), metal); ant.position.set(-0.3, 3.5, 0.3); station.add(ant);
   station.position.set(PLOT_W / 2 - 1.2, 0.5, -PLOT_D / 2 + 1.2); g.add(station);
-  // pump house + pipe
-  const pumpHouse = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 2), new THREE.MeshStandardMaterial({ color: 0x7c8a6a }));
-  pumpHouse.position.set(-PLOT_W / 2 - 2.2, 0.9, PLOT_D / 2 - 2); pumpHouse.castShadow = true; g.add(pumpHouse);
-  const pumpLampMat = new THREE.MeshStandardMaterial({ color: 0x3a8fd6, emissive: 0x3a8fd6, emissiveIntensity: 0 });
-  const pumpLamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), pumpLampMat); pumpLamp.position.set(-PLOT_W / 2 - 2.2, 2.05, PLOT_D / 2 - 2); g.add(pumpLamp);
-  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 3, 8), new THREE.MeshStandardMaterial({ color: 0x2b6cb0 }));
-  pipe.rotation.z = Math.PI / 2; pipe.position.set(-PLOT_W / 2 - 0.4, 0.5, PLOT_D / 2 - 2); g.add(pipe);
+  const pumpHouse = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 2), new THREE.MeshStandardMaterial({ color: 0x7c8a6a })); pumpHouse.position.set(-PLOT_W / 2 - 2.2, 0.9, PLOT_D / 2 - 2); pumpHouse.castShadow = true; g.add(pumpHouse);
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0x3a8fd6, emissive: 0x3a8fd6, emissiveIntensity: 0 });
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), lampMat); lamp.position.set(-PLOT_W / 2 - 2.2, 2.05, PLOT_D / 2 - 2); g.add(lamp);
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 3, 8), new THREE.MeshStandardMaterial({ color: 0x2b6cb0 })); pipe.rotation.z = Math.PI / 2; pipe.position.set(-PLOT_W / 2 - 0.4, 0.5, PLOT_D / 2 - 2); g.add(pipe);
+  g.traverse(o => { if (o.isMesh && !o.isInstancedMesh && o !== heat) { o.userData.pick = id; pickables.push(o); } });
   scene.add(g);
-  // label
-  const label = document.createElement("div"); label.className = "label"; $("#labels").appendChild(label);
-  plots[st.station_id] = { st, style, g, soilMat, waterMat, stems, leaves, fruits, plants, ledMat, pumpLampMat, label, heads,
-    stationWorld: new THREE.Vector3(cx + PLOT_W / 2 - 1.2, 4.6, cz - PLOT_D / 2 + 1.2), lastUploads: 0, ledUntil: 0, cx, cz };
+  const tag = document.createElement("div"); tag.className = "tag3d"; document.getElementById("tags").appendChild(tag);
+  const noise = Array.from({ length: 44 * 32 }, (_, i) => { const x = i % 44, y = Math.floor(i / 44); return 0.09 * Math.sin(x * 0.45 + id.length) * Math.cos(y * 0.5) + 0.05 * Math.sin((x + y) * 1.3); });
+  plots[id] = { id, st, style, soilMat, heat, waterMat, stems, leaves, fruits, plants, ledMat, lampMat, heads, tag, noise, cx, cz,
+    stationWorld: new THREE.Vector3(cx + PLOT_W / 2 - 1.2, 4.7, cz - PLOT_D / 2 + 1.2), lastUploads: -1, ledUntil: 0, lastHealth: -1 };
 }
+
+const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, z]) => new THREE.Vector3(x * (PLOT_W / 2 + 0.8), 0.7, z * (PLOT_D / 2 + 0.8)))),
+  new THREE.LineBasicMaterial({ color: 0x5ab0e6, transparent: true }));
+scene.add(outline);
+const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 30, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x5ab0e6, transparent: true, opacity: 0.18, depthWrite: false }));
+scene.add(beacon);
 
 const dummy = new THREE.Object3D(), tmpC = new THREE.Color();
 function updatePlants(p, health, wilt) {
-  const { plants, style, stems, leaves, fruits } = p;
-  tmpC.copy(SICK).lerp(HEALTHY, health);
-  let fi = 0;
+  const { plants, style, stems, leaves, fruits } = p; tmpC.copy(SICK).lerp(HEALTHY, health); let fi = 0;
   plants.forEach((pl, i) => {
     const h = style.h * pl.s * (0.75 + 0.25 * health);
-    dummy.position.set(pl.x, 0.6 + h / 2, pl.z); dummy.rotation.set(wilt * 0.35, pl.rot, 0); dummy.scale.set(1, h, 1); dummy.updateMatrix();
-    stems.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(pl.x, 0.6 + h / 2, pl.z); dummy.rotation.set(wilt * 0.35, pl.rot, 0); dummy.scale.set(1, h, 1); dummy.updateMatrix(); stems.setMatrixAt(i, dummy.matrix);
     const l = style.leaf * pl.s * (0.8 + 0.2 * health);
     dummy.position.set(pl.x, 0.6 + h * (1 - 0.15 * wilt), pl.z); dummy.rotation.set(0, pl.rot, 0);
     dummy.scale.set(l * 1.15, l * (p.st.crop === "groundnut" ? 0.55 : 1) * (1 - 0.3 * wilt), l * 1.15); dummy.updateMatrix();
     leaves.setMatrixAt(i, dummy.matrix); leaves.setColorAt(i, tmpC);
-    if (fruits) for (const f of pl.fruit) {
-      dummy.position.set(pl.x + f[0] * l * 1.4, 0.6 + h * (0.55 + 0.45 * f[1]), pl.z + f[2] * l * 1.4);
-      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, p.st.crop === "chilli" ? 2.6 : 1, 1); dummy.updateMatrix();
-      fruits.setMatrixAt(fi++, dummy.matrix);
-    }
+    if (fruits) for (const f of pl.fruit) { dummy.position.set(pl.x + f[0] * l * 1.4, 0.6 + h * (0.55 + 0.45 * f[1]), pl.z + f[2] * l * 1.4);
+      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, p.st.crop === "chilli" ? 2.6 : 1, 1); dummy.updateMatrix(); fruits.setMatrixAt(fi++, dummy.matrix); }
   });
   stems.instanceMatrix.needsUpdate = true; leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true;
   if (fruits) fruits.instanceMatrix.needsUpdate = true;
 }
+const HEAT = [[224, 83, 61], [232, 185, 49], [140, 203, 106], [90, 176, 230]];
+function paintHeat(p, frac, refill) {
+  const c = p.heat.material.map.image, ctx = c.getContext("2d"), img = ctx.createImageData(44, 32);
+  for (let i = 0; i < 44 * 32; i++) {
+    const v = Math.max(0, Math.min(1, (frac + p.noise[i] - refill * 0.6) / (1.05 - refill * 0.6)));
+    const s = v * 3, k = Math.min(2, Math.floor(s)), t = s - k, a = HEAT[k], b = HEAT[k + 1];
+    img.data[i * 4] = a[0] + (b[0] - a[0]) * t; img.data[i * 4 + 1] = a[1] + (b[1] - a[1]) * t; img.data[i * 4 + 2] = a[2] + (b[2] - a[2]) * t; img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0); p.heat.material.map.needsUpdate = true;
+}
 
-// ---------------------------------------------------------------- particles: rain, spray, data packets
-const RAIN_N = 4000;
-const rainGeo = new THREE.BufferGeometry();
-const rainPos = new Float32Array(RAIN_N * 3);
-for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = (Math.random() - 0.5) * 140; rainPos[i * 3 + 1] = Math.random() * 50; rainPos[i * 3 + 2] = (Math.random() - 0.5) * 100; }
+const RAIN_N = 4000, rainGeo = new THREE.BufferGeometry(), rainPos = new Float32Array(RAIN_N * 3);
+for (let i = 0; i < RAIN_N; i++) rainPos.set([(Math.random() - 0.5) * 150, Math.random() * 50, (Math.random() - 0.5) * 110], i * 3);
 rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
-const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0xaecdf2, size: 0.28, transparent: true, opacity: 0 }));
-scene.add(rain);
-
-const SPRAY_N = 1500;
-const sprayGeo = new THREE.BufferGeometry(), sprayPos = new Float32Array(SPRAY_N * 3), sprayVel = new Float32Array(SPRAY_N * 3), sprayOwner = new Array(SPRAY_N).fill(null);
+const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0xaecdf2, size: 0.28, transparent: true, opacity: 0 })); scene.add(rain);
+const SPRAY_N = 1500, sprayGeo = new THREE.BufferGeometry(), sprayPos = new Float32Array(SPRAY_N * 3).fill(-100), sprayVel = new Float32Array(SPRAY_N * 3), sprayOwner = new Array(SPRAY_N).fill(null);
 sprayGeo.setAttribute("position", new THREE.BufferAttribute(sprayPos, 3));
-const spray = new THREE.Points(sprayGeo, new THREE.PointsMaterial({ color: 0x5fb0ff, size: 0.22, transparent: true, opacity: 0.9 }));
-spray.frustumCulled = false; scene.add(spray);
-for (let i = 0; i < SPRAY_N; i++) sprayPos[i * 3 + 1] = -100;
-
-const packets = [];
-const packetGeo = new THREE.SphereGeometry(0.28, 10, 8);
-function sendPacket(from, color = 0x7cf0a8) {
+const spray = new THREE.Points(sprayGeo, new THREE.PointsMaterial({ color: 0x6fbfff, size: 0.22, transparent: true, opacity: 0.9 })); spray.frustumCulled = false; scene.add(spray);
+const packets = [], packetGeo = new THREE.SphereGeometry(0.3, 10, 8);
+function sendPacket(from, color) { if (!T.layers.flow) return;
   const m = new THREE.Mesh(packetGeo, new THREE.MeshBasicMaterial({ color })); scene.add(m);
-  const mid = from.clone().lerp(GATEWAY, 0.5); mid.y += 8;
-  packets.push({ m, curve: new THREE.QuadraticBezierCurve3(from.clone(), mid, GATEWAY.clone()), t: 0 });
-}
+  const mid = from.clone().lerp(GATEWAY, 0.5); mid.y += 9; packets.push({ m, curve: new THREE.QuadraticBezierCurve3(from.clone(), mid, GATEWAY.clone()), t: 0 }); }
 
-// ---------------------------------------------------------------- simulation control
-function start(newSeed) {
-  seed = newSeed; farm = new KSFarm.Farm({ seed, days: SEASON_DAYS }); farm.run(6); carry = 0;
-  for (const p of Object.values(plots)) p.lastUploads = farm.fields[p.st.station_id].totals.uploads;
-  setPlaying(true);
-}
-function setPlaying(p) { playing = p; $("#play").textContent = p ? "⏸ Pause" : "▶ Play"; }
-$("#play").onclick = () => { if (farm.finished) start(seed); else setPlaying(!playing); };
-document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
-  speed = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b)); });
-$("#restart").onclick = () => start(1 + Math.floor(Math.random() * 999));
-$("#spin").onclick = () => { spin = !spin; controls.autoRotate = spin; $("#spin").classList.toggle("on", spin); };
+// ---------- camera flights ----------
+const PRESETS = { overview: [[-40, 36, 62], [0, 0, 2]], gateway: [[16, 12, -4], [0, 3, -20]], low: [[-34, 4.5, 30], [0, 2, 0]] };
+for (const [id, [x, z]] of Object.entries(LAYOUT)) PRESETS[id] = [[x - 13, 15, z + 24], [x, 0.5, z]];
+let flight = null;
+function flyTo(name) { const p = PRESETS[name]; if (!p) return;
+  flight = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toP: new THREE.Vector3(...p[0]), toT: new THREE.Vector3(...p[1]) };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) flight.t = 0.999; }
+camera.position.set(...PRESETS.overview[0]); controls.target.set(...PRESETS.overview[1]);
 
-start(7);
-for (const st of farm.stations) buildPlot(st);
+// ---------- picking ----------
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), hoverEl = document.getElementById("hover");
+let down = null;
+function pick(ev) { const r = renderer.domElement.getBoundingClientRect();
+  mouse.set((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(pickables, false)[0]; return hit ? hit.object.userData.pick : null; }
+renderer.domElement.addEventListener("pointermove", ev => {
+  const id = pick(ev); renderer.domElement.style.cursor = id ? "pointer" : "grab";
+  if (!id) { hoverEl.style.display = "none"; return; }
+  let text;
+  if (id === "gateway") text = "Raspberry Pi gateway: stores readings, runs the advisor and sends WhatsApp messages. Click to fly here.";
+  else { const adv = T.farm.api(`/api/v1/advice?station_id=${id}`); text = `${plots[id].st.name.split(" (")[0]}: ${adv.available_water_pct ?? "–"}% soil water. Click to inspect.`; }
+  hoverEl.textContent = text; hoverEl.style.display = "block"; hoverEl.style.left = ev.clientX + "px"; hoverEl.style.top = ev.clientY + "px";
+});
+renderer.domElement.addEventListener("pointerdown", ev => { down = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener("pointerup", ev => {
+  if (!down || Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 5) return;
+  const id = pick(ev); if (id === "gateway") flyTo("gateway"); else if (id) T.select(id);
+});
+renderer.domElement.addEventListener("pointerleave", () => { hoverEl.style.display = "none"; });
 
-// ---------------------------------------------------------------- per-frame update
-const clock = new THREE.Clock();
-let hudTimer = 0;
-const v = new THREE.Vector3();
-function pumpActive(f) {
-  const p = f.pumps[f.pumps.length - 1];
-  return p && farm.ts >= p.issued_at && farm.ts < p.issued_at + p.minutes * 60;
-}
+// ---------- wiring to the twin ----------
+for (const st of T.farm.stations) buildPlot(st);
+T.on("select", id => { if (T.mode === "3d") flyTo(id); });
+T.on("preset", name => flyTo(name));
+T.on("restart", () => { for (const p of Object.values(plots)) p.lastUploads = -1; });
+T.on("layer", (name, on) => { if (name === "heat") for (const p of Object.values(plots)) { p.heat.visible = on; if (on) paintHeat(p, T.farm.fields[p.id].avail / T.farm.fields[p.id].taw, 1 - T.farm.fields[p.id].raw / T.farm.fields[p.id].taw); } });
+T.has3d = true;
+document.getElementById("note3d").style.display = "none";
+if (T.mode === "map") T.setMode("3d");
+
+// ---------- frame ----------
+const clock = new THREE.Clock(), v = new THREE.Vector3(), cloudy = new THREE.Color(0x6d7480), cloudyLow = new THREE.Color(0x9aa3ad);
+const TAGC = { OK: "#8ccb6a", IRRIGATE_SOON: "#e8b931", IRRIGATE_NOW: "#e0533d", SKIP_RAIN: "#5ab0e6" };
+let heatTimer = 0;
 function frame() {
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, clock.getDelta());
-  if (playing && !farm.finished) {
-    carry += dt * speed * 3600;
-    while (carry >= KSFarm.STEP_S && farm.tick()) carry -= KSFarm.STEP_S;
-  } else if (farm.finished && playing) setPlaying(false);
-  const ts = farm.ts + (playing ? carry : 0), h = KSFarm.simHour(ts), w = farm.weather.day(KSFarm.simDay(farm.ts));
-
-  // sun, sky, light
+  if (T.mode !== "3d") return;
+  const farm = T.farm, ts = farm.ts + (T.playing ? T.carry : 0), h = KSFarm.simHour(ts), w = farm.weather.day(KSFarm.simDay(farm.ts));
   const elev = Math.sin(Math.PI * (h - 6) / 12), az = Math.PI * (h - 6) / 12;
   sun.position.set(-Math.cos(az) * 120, Math.max(elev, -0.2) * 110 + 4, -40);
-  sunDisc.position.copy(sun.position).normalize().multiplyScalar(330); sunDisc.visible = elev > -0.05;
+  sunDisc.position.copy(sun.position).normalize().multiplyScalar(350); sunDisc.visible = elev > -0.05;
   const day = THREE.MathUtils.clamp(elev * 2.2 + 0.25, 0, 1), dusk = THREE.MathUtils.clamp(1 - Math.abs(elev) * 4, 0, 1) * (elev > -0.3 ? 1 : 0);
-  const raining = w.rain_mm > 0 && h >= 14.5 && h < 16.5, overcast = w.rain_mm > 0 && h >= 12 && h < 18 ? 0.45 : 0;
-  sun.intensity = 2.6 * day * (1 - overcast); hemi.intensity = 0.15 + 0.75 * day;
-  skyU.top.value.setRGB(0.04 + 0.27 * day, 0.07 + 0.49 * day, 0.15 + 0.69 * day).lerp(new THREE.Color(0x6d7480), overcast);
-  skyU.bottom.value.setRGB(0.08 + 0.78 * day + 0.5 * dusk, 0.1 + 0.82 * day + 0.2 * dusk, 0.18 + 0.79 * day).lerp(new THREE.Color(0x9aa3ad), overcast);
+  const showWx = T.layers.weather, raining = showWx && w.rain_mm > 0 && h >= 14.5 && h < 16.5, overcast = showWx && w.rain_mm > 0 && h >= 11 && h < 18 ? 0.5 : 0;
+  sun.intensity = 2.6 * day * (1 - overcast); hemi.intensity = 0.16 + 0.74 * day;
+  skyU.top.value.setRGB(0.04 + 0.27 * day, 0.07 + 0.49 * day, 0.15 + 0.69 * day).lerp(cloudy, overcast);
+  skyU.bottom.value.setRGB(0.08 + 0.78 * day + 0.5 * dusk, 0.1 + 0.82 * day + 0.22 * dusk, 0.18 + 0.79 * day).lerp(cloudyLow, overcast);
   scene.fog.color.copy(skyU.bottom.value); stars.material.opacity = THREE.MathUtils.clamp(-elev * 3, 0, 0.9);
+  cloudMat.opacity += ((overcast ? 0.85 : showWx ? 0.25 : 0) - cloudMat.opacity) * Math.min(1, dt * 2);
+  cloudMat.color.setScalar(overcast ? 0.75 : 1); clouds.children.forEach((c, i) => { c.position.x += dt * (1 + i % 3); if (c.position.x > 110) c.position.x = -110; });
   rain.material.opacity = raining ? 0.75 : Math.max(0, rain.material.opacity - dt);
-  if (rain.material.opacity > 0) {
-    for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3 + 1] -= dt * 38; if (rainPos[i * 3 + 1] < 0) rainPos[i * 3 + 1] += 50; }
-    rainGeo.attributes.position.needsUpdate = true;
-  }
-
-  // plots
+  if (rain.material.opacity > 0) { for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3 + 1] -= dt * 38; if (rainPos[i * 3 + 1] < 0) rainPos[i * 3 + 1] += 50; } rainGeo.attributes.position.needsUpdate = true; }
+  heatTimer -= dt; const repaint = heatTimer <= 0; if (repaint) heatTimer = 0.4;
+  const now = performance.now();
   for (const p of Object.values(plots)) {
-    const f = farm.fields[p.st.station_id], frac = f.avail / f.taw, dep = 1 - frac, rawFrac = f.raw / f.taw;
+    const f = farm.fields[p.id], frac = f.avail / f.taw, dep = 1 - frac, rawFrac = f.raw / f.taw;
     p.soilMat.color.copy(DRY).lerp(WET, THREE.MathUtils.clamp(frac, 0, 1));
-    const health = THREE.MathUtils.clamp(1 - Math.max(0, dep - rawFrac) / (0.85 - rawFrac + 1e-6), 0, 1);
+    const health = THREE.MathUtils.clamp(1 - Math.max(0, dep - rawFrac) / (0.85 - rawFrac), 0, 1);
     const wilt = THREE.MathUtils.clamp((dep - rawFrac) * 3, 0, 1) * (h > 11 && h < 17 ? 1 : 0.5);
-    updatePlants(p, health, wilt);
-    const pumping = pumpActive(f);
-    p.pumpLampMat.emissiveIntensity = pumping ? 2 + Math.sin(performance.now() / 120) : 0;
-    const wantWater = pumping && p.st.irrigation_method === "furrow" ? 0.55 : Math.max(0, p.waterMat.opacity - dt * 0.4);
-    p.waterMat.opacity += (wantWater - p.waterMat.opacity) * Math.min(1, dt * 3);
-    p.pumping = pumping;
-    // upload → LED blink + data packet
-    if (f.totals.uploads > p.lastUploads) {
-      if (f.totals.uploads - p.lastUploads < 40) sendPacket(p.stationWorld, f.lastUpload && f.lastUpload.sent > 1 ? 0xffd166 : 0x7cf0a8);
-      p.lastUploads = f.totals.uploads; p.ledUntil = performance.now() + 250;
-    }
-    if (f.online === false) { p.ledMat.color.set(0xef4444); p.ledMat.emissive.set(0xef4444); p.ledMat.emissiveIntensity = (performance.now() % 1000) < 500 ? 2 : 0.2; }
-    else { p.ledMat.color.set(0x22c55e); p.ledMat.emissive.set(0x22c55e); p.ledMat.emissiveIntensity = performance.now() < p.ledUntil ? 3 : 0.15; }
+    const key = Math.round(health * 50) + Math.round(wilt * 20) * 100;
+    if (key !== p.lastHealth) { updatePlants(p, health, wilt); p.lastHealth = key; }
+    if (repaint && p.heat.visible) paintHeat(p, frac, 1 - rawFrac);
+    const pumping = T.pumpActive(p.id); p.pumping = pumping;
+    p.lampMat.emissiveIntensity = pumping ? 2 + Math.sin(now / 120) : 0;
+    const want = pumping && p.st.irrigation_method === "furrow" ? 0.55 : 0;
+    p.waterMat.opacity += (want - p.waterMat.opacity) * Math.min(1, dt * 2.5);
+    if (p.lastUploads < 0) p.lastUploads = f.totals.uploads;
+    if (f.totals.uploads > p.lastUploads) { if (f.totals.uploads - p.lastUploads < 30) sendPacket(p.stationWorld, f.lastUpload && f.lastUpload.sent > 1 ? 0xffd166 : 0x7cf0a8);
+      p.lastUploads = f.totals.uploads; p.ledUntil = now + 250; }
+    const offline = f.online === false;
+    p.ledMat.color.set(offline ? 0xef4444 : 0x22c55e); p.ledMat.emissive.copy(p.ledMat.color);
+    p.ledMat.emissiveIntensity = offline ? (now % 1000 < 500 ? 2.2 : 0.2) : now < p.ledUntil ? 3 : 0.15;
   }
-
-  // sprinkler / drip spray particles
+  const active = Object.values(plots).filter(p => p.pumping && p.st.irrigation_method !== "furrow");
   for (let i = 0; i < SPRAY_N; i++) {
     let o = sprayOwner[i];
     if (o && sprayPos[i * 3 + 1] < 0.6) { o = sprayOwner[i] = null; sprayPos[i * 3 + 1] = -100; }
-    if (!o) {
-      const active = Object.values(plots).filter(p => p.pumping && p.st.irrigation_method !== "furrow");
-      if (active.length && Math.random() < 0.5) {
-        const p = active[i % active.length]; sprayOwner[i] = p;
-        if (p.st.irrigation_method === "sprinkler") {
-          const hd = p.heads[i % p.heads.length], a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 3;
-          sprayPos.set([hd.x, hd.y, hd.z], i * 3); sprayVel.set([Math.cos(a) * s, 3 + Math.random() * 2, Math.sin(a) * s], i * 3);
-        } else {
-          const pl = p.plants[(i * 7) % p.plants.length];
-          sprayPos.set([p.cx + pl.x, 0.75, p.cz + pl.z], i * 3); sprayVel.set([0, -0.4, 0], i * 3);
-        }
-      }
-      continue;
-    }
-    sprayVel[i * 3 + 1] -= 9.8 * dt;
-    for (let k = 0; k < 3; k++) sprayPos[i * 3 + k] += sprayVel[i * 3 + k] * dt;
+    if (!o) { if (active.length && Math.random() < 0.5) { const p = active[i % active.length]; sprayOwner[i] = p;
+        if (p.st.irrigation_method === "sprinkler") { const hd = p.heads[i % p.heads.length], a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 3;
+          sprayPos.set([hd.x, hd.y, hd.z], i * 3); sprayVel.set([Math.cos(a) * s, 3 + Math.random() * 2, Math.sin(a) * s], i * 3); }
+        else { const pl = p.plants[(i * 7) % p.plants.length]; sprayPos.set([p.cx + pl.x, 0.78, p.cz + pl.z], i * 3); sprayVel.set([0, -0.3, 0], i * 3); } }
+      continue; }
+    sprayVel[i * 3 + 1] -= 9.8 * dt; for (let k = 0; k < 3; k++) sprayPos[i * 3 + k] += sprayVel[i * 3 + k] * dt;
   }
   sprayGeo.attributes.position.needsUpdate = true;
-
-  // data packets
-  for (let i = packets.length - 1; i >= 0; i--) {
-    const pk = packets[i]; pk.t += dt * 1.1;
-    if (pk.t >= 1) { scene.remove(pk.m); pk.m.material.dispose(); packets.splice(i, 1); continue; }
-    pk.m.position.copy(pk.curve.getPoint(pk.t));
-  }
-
+  for (let i = packets.length - 1; i >= 0; i--) { const pk = packets[i]; pk.t += dt * 1.1;
+    if (pk.t >= 1 || !T.layers.flow) { scene.remove(pk.m); pk.m.material.dispose(); packets.splice(i, 1); continue; } pk.m.position.copy(pk.curve.getPoint(pk.t)); }
+  const sel = plots[T.selected];
+  if (sel) { outline.position.set(sel.cx, 0, sel.cz); outline.material.opacity = 0.55 + 0.45 * Math.sin(now / 400);
+    beacon.position.set(sel.stationWorld.x, 15, sel.stationWorld.z); }
+  if (flight) { flight.t = Math.min(1, flight.t + dt / 1.2); const e = flight.t < 0.5 ? 4 * flight.t ** 3 : 1 - (-2 * flight.t + 2) ** 3 / 2;
+    camera.position.lerpVectors(flight.fromP, flight.toP, e); controls.target.lerpVectors(flight.fromT, flight.toT, e); if (flight.t >= 1) flight = null; }
   controls.update();
   renderer.render(scene, camera);
-
-  // labels follow the stations
+  const W = renderer.domElement.clientWidth, H = renderer.domElement.clientHeight;
   for (const p of Object.values(plots)) {
-    v.copy(p.stationWorld); v.y += 1.6; v.project(camera);
-    const vis = v.z < 1;
-    p.label.style.display = vis ? "block" : "none";
-    if (vis) { p.label.style.left = ((v.x + 1) / 2 * innerWidth) + "px"; p.label.style.top = ((1 - v.y) / 2 * innerHeight) + "px"; }
+    if (!T.layers.labels) { p.tag.style.display = "none"; continue; }
+    v.copy(p.stationWorld); v.y += 1.4; v.project(camera);
+    const vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1; p.tag.style.display = vis ? "flex" : "none";
+    if (!vis) continue;
+    p.tag.style.left = ((v.x + 1) / 2 * W) + "px"; p.tag.style.top = ((1 - v.y) / 2 * H) + "px";
+    const adv = farm.api(`/api/v1/advice?station_id=${p.id}`), col = TAGC[adv.status] || "#c084fc", off = farm.fields[p.id].online === false;
+    const txt = `${p.st.name.split(" (")[0].replace(" plot", "")} ${adv.available_water_pct ?? "–"}%${p.pumping ? ", watering" : ""}${off ? ", offline" : ""}`;
+    if (p.tag.dataset.txt !== txt + col) { p.tag.dataset.txt = txt + col; p.tag.innerHTML = `<i style="background:${col}"></i>${txt}`; }
   }
-
-  hudTimer -= dt;
-  if (hudTimer <= 0) { hudTimer = 0.3; hud(w, raining); }
-  requestAnimationFrame(frame);
 }
-
-function hud(w, raining) {
-  $("#clock").textContent = fmtTime(farm.ts);
-  $("#day").textContent = `day ${Math.min(KSFarm.simDay(farm.ts) + 1, SEASON_DAYS)} of ${SEASON_DAYS}` + (farm.finished ? " · season complete" : "");
-  $("#weather").textContent = `${raining ? "🌧️ Raining" : w.rain_mm > 0 ? "☁️ Rain due this afternoon" : "☀️ Dry day"} · ${w.t_min.toFixed(0)}–${w.t_max.toFixed(0)} °C · `
-    + `forecast said ${w.forecast_rain_mm.toFixed(0)} mm at ${Math.round(w.forecast_prob_pct)}%`;
-  for (const p of Object.values(plots)) {
-    const adv = farm.api(`/api/v1/advice?station_id=${p.st.station_id}`), f = farm.fields[p.st.station_id];
-    const [lab, col] = STATUS[adv.status] || [adv.status, "#52514e"], water = adv.available_water_pct;
-    p.label.innerHTML = `<b>${esc(p.st.name.split(" (")[0])}</b> · ${esc(p.st.irrigation_method)}${p.st.auto_pump ? " · auto pump" : ""}<br>
-      <span class="st" style="color:${col}">${lab}</span>${p.pumping ? " · 💧 pump running" : ""}${f.online === false ? ` · 📵 offline (${f.buffer.length} saved)` : ""}
-      <div class="bar"><i style="width:${Math.min(100, water || 0)}%"></i></div>soil water ${water ?? "–"}% · refill at ${Math.round(100 * (1 - KSFarm.CROPS[p.st.crop][4]))}%`;
-  }
-  const msgs = farm.alerts.filter(a => a.recipient === "SIMULATED-or").slice(0, 3);
-  $("#msgs").innerHTML = msgs.length ? msgs.map(a => `<div class="wa">${esc(a.text)}<div class="t">${fmtTime(a.sent_at)}</div></div>`).join("")
-    : `<div class="wa">No alerts yet</div>`;
-}
-
-addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener("resize", () => { const W = host.clientWidth || innerWidth, H = host.clientHeight || innerHeight; camera.aspect = W / H; camera.updateProjectionMatrix(); renderer.setSize(W, H); });
+flyTo(T.selected);
 frame();
-</script>
-<script>
-  // if the 3D library cannot load (offline / blocked CDN), say so instead of a blank screen
-  setTimeout(() => { const l = document.getElementById("loading"); if (l) l.innerHTML =
-    "The 3D view needs an internet connection to load its graphics library (three.js).<br>" +
-    '<a style="color:#9cc8ff" href="./">Open the live dashboard instead</a>'; }, 8000);
 </script>
 </body>
 </html>

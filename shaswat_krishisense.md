@@ -9,7 +9,7 @@ Odia, Hindi or English.
 cd server
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest -q                          # 30 tests
+pytest -q                          # 31 tests
 node ../docs/simulator.test.js     # browser simulator logic
 python -m krishisense demo         # 12 simulated days, no hardware needed
 python -m krishisense sim          # virtual stations + live dashboard on :8080
@@ -36,7 +36,7 @@ python -m krishisense --config stations.wokwi.json --db wokwi.db serve   # serve
   DHT22 instead of BME280, 15 s interval, host.wokwi.internal:8080, pump enabled at 1 s per minute),
   `server/stations.wokwi.json` (station `wokwi-01`, key `wokwi-demo-key`).
 - `.vscode/`: recommended extensions + tasks (build Wokwi firmware, server for Wokwi, simulation, tests).
-- `docs/farm3d.html`: three.js 3D view (CDN, pinned 0.170.0) driven by `farm-engine.js`.
+- `docs/farm3d.html`: "KrishiSense twin". A classic script (window.Twin) runs the sim, time travel (replays from day 0), events and all 2D panels plus a map view; a three.js module (CDN, pinned 0.170.0) plugs in for 3D and falls back to the map after 6 s if it can't load.
 - `docs/` (GitHub Pages site, opens from the link with no install):
   `index.html` live farm dashboard driven by `farm-engine.js` (JS port of virtual stations + advisor +
   alert rules, answering the same /api/v1 paths as the server); `season.html` KrishiSense vs fixed-schedule

@@ -5,7 +5,7 @@
 **A solar soil and weather station that tells farmers when to irrigate, and for how long, on WhatsApp in Odia, Hindi or English.**
 
 ▶ **[Open the live farm simulation](https://shaswatprof2000-git-hub.github.io/krishisense/)**: three virtual sensor stations, the irrigation advisor and WhatsApp alerts running in your browser. No install.
-· **[3D farm](https://shaswatprof2000-git-hub.github.io/krishisense/farm3d.html)**: the same farms in 3D, with day and night, rain, pumps and sensor data flying to the gateway.
+· **[3D digital twin](https://shaswatprof2000-git-hub.github.io/krishisense/farm3d.html)**: explore the farms in 3D, click a field to see its root zone, sensors and advice, and drag through the season. Has a 2D map view that works offline.
 · **[Season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html)**: KrishiSense advice vs a fixed watering schedule.
 
 Farmers usually irrigate by habit or by looking at the soil surface. That often means too much water, too
@@ -51,7 +51,7 @@ Crops included: tomato, brinjal, chilli, maize, groundnut, cabbage, potato, wate
 cd server
 pip install -e ".[dev]"
 python -m krishisense demo        # 12 simulated days: OK -> irrigate soon -> irrigate now -> skip for rain
-pytest -q                         # 30 tests
+pytest -q                         # 31 tests
 ```
 
 ## Simulation: the whole system without hardware
