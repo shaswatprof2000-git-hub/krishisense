@@ -1,6 +1,6 @@
 // Checks the browser simulator's core logic with Node: `node docs/simulator.test.js`
 const fs = require("fs"), path = require("path"), assert = require("assert");
-const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
+const html = fs.readFileSync(path.join(__dirname, "season.html"), "utf8");
 const core = html.slice(html.indexOf("// ===== KS-CORE-START"), html.indexOf("// ===== KS-CORE-END"));
 const KS = new Function(core + "\nreturn KS;")();
 
@@ -24,3 +24,27 @@ for (const crop of Object.keys(KS.CROPS)) for (const soil of Object.keys(KS.SOIL
 }
 console.log(`simulator OK: KrishiSense ${(r.farmers.ks.litres / 1000).toFixed(0)} m3, ` +
             `fixed schedule ${(r.farmers.fixed.litres / 1000).toFixed(0)} m3 over ${base.days} days`);
+
+// ---- live farm engine (docs/farm-engine.js) ----
+const KSFarm = require("./farm-engine.js");
+const farm = new KSFarm.Farm({ seed: 7, days: 30 });
+farm.run(30 * 24);
+assert(farm.finished && !farm.tick(), "season ends after 30 days");
+const byId = Object.fromEntries(farm.summary().map(s => [s.station_id, s]));
+assert(byId["sim-chilli"].max_buffered_readings >= 45, "12 h outage is buffered on the station");
+assert(byId["sim-groundnut"].pump_runs >= 1, "automatic pump control acted");
+assert(byId["sim-tomato"].pump_runs >= 1, "farmer followed the advice");
+const en = farm.alerts.filter(a => a.recipient === "SIMULATED-en");
+assert(en.some(a => a.station_id === "sim-chilli" && a.status === "SENSOR_STALE"), "outage raised a no-data alert");
+const perStatus = {};
+for (const a of en) perStatus[a.station_id + a.status] = (perStatus[a.station_id + a.status] || 0) + 1;
+for (const [k, n] of Object.entries(perStatus)) assert(n <= 30 * 24 / 20 + 1, `alert spam: ${k} ${n}`);
+assert(farm.alerts.every(a => !a.text.includes("{")), "all messages fully rendered");
+const info = farm.api("/api/v1/stations");
+assert(info.simulated && info.stations.length === 3);
+for (const st of info.stations) {
+  const h = farm.api(`/api/v1/history?station_id=${st.station_id}&days=7`);
+  assert(h.length > 300 && h.every(p => p.water_pct >= 0 && p.water_pct <= 110));
+  assert(typeof farm.api(`/api/v1/advice?station_id=${st.station_id}`).status === "string");
+}
+console.log("live farm OK:", farm.summary().map(s => `${s.station_id} ${s.water_m3} m3, ${s.pump_runs} runs`).join("; "));

@@ -4,7 +4,8 @@
 
 **A solar soil and weather station that tells farmers when to irrigate, and for how long, on WhatsApp in Odia, Hindi or English.**
 
-▶ **[Try the simulator in your browser](https://shaswatprof2000-git-hub.github.io/krishisense/)**: a season of KrishiSense advice vs a fixed watering schedule, no install.
+▶ **[Open the live farm simulation](https://shaswatprof2000-git-hub.github.io/krishisense/)**: three virtual sensor stations, the irrigation advisor and WhatsApp alerts running in your browser. No install.
+· **[Season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html)**: KrishiSense advice vs a fixed watering schedule.
 
 Farmers usually irrigate by habit or by looking at the soil surface. That often means too much water, too
 much diesel or electricity, and stressed crops when they guess wrong. KrishiSense measures soil moisture at
@@ -83,9 +84,12 @@ The server runs unchanged, in simulation mode: its clock follows the readings an
 forecast instead of Open-Meteo. The dashboard at `http://localhost:8080` shows each station's soil water,
 refill point, pump runs and the WhatsApp messages it would have sent. Nothing is sent to real phones.
 
-The [browser simulator](https://shaswatprof2000-git-hub.github.io/krishisense/) (`docs/index.html`) is a
-simplified JavaScript version of the same water balance and advice. Its KrishiSense farmer waters on the
-day the advice says so. Results from either simulator are illustrative, not field results.
+**In the browser, with nothing to install:** the [live farm](https://shaswatprof2000-git-hub.github.io/krishisense/)
+(`docs/index.html` + `docs/farm-engine.js`) runs the same three stations, advisor, alert rules and dashboard as
+JavaScript, so anyone can open the link and watch a season play out. The
+[season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html) (`docs/season.html`) is a
+simplified model that compares a KrishiSense farmer with a fixed watering schedule; its KrishiSense farmer
+waters on the day the advice says so. Results from all the simulators are illustrative, not field results.
 
 ## Run it for real
 

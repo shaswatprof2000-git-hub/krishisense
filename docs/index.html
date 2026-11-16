@@ -3,313 +3,259 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KrishiSense · Irrigation simulator</title>
-<meta name="description" content="Try KrishiSense in your browser: simulate a season of smart irrigation advice vs a fixed watering schedule.">
+<title>KrishiSense · Live farm simulation</title>
+<meta name="description" content="KrishiSense running in your browser: three virtual solar soil stations, an FAO-56 irrigation advisor and WhatsApp alerts in Odia and English.">
 <style>
-  :root { --surface:#fcfcfb; --card:#fff; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --grid:#e6e5e0;
-          --blue:#2a78d6; --orange:#eb6834; --good:#1a8a5c; --warn:#b47c00; --serious:#c4471f; --info:#2a78d6; }
+  :root {
+    --surface: #fcfcfb; --card: #ffffff; --ink: #0b0b0b; --ink2: #52514e; --muted: #8a8984;
+    --grid: #e6e5e0; --blue: #2a78d6; --orange: #eb6834;
+    --good: #1a8a5c; --warn: #b47c00; --serious: #c4471f; --critical: #a3122b; --info: #2a78d6;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--surface); color:var(--ink); }
-  .wrap { max-width:1180px; margin:0 auto; padding:28px 22px 40px; }
-  h1 { font-size:30px; margin:0 0 4px; } h2 { font-size:18px; margin:0 0 10px; }
-  .lede { color:var(--ink2); max-width:760px; margin:0 0 20px; }
-  .grid { display:grid; grid-template-columns:300px minmax(0,1fr); gap:20px; }
-  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
-  .card { background:var(--card); border:1px solid var(--grid); border-radius:12px; padding:16px 18px; }
-  label { display:block; font-size:13px; color:var(--ink2); margin:10px 0 3px; }
-  select,input[type=number] { width:100%; padding:7px 8px; border:1px solid var(--grid); border-radius:8px; font:inherit; background:#fff; }
-  input[type=range]{ width:100%; }
-  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .val { float:right; color:var(--ink); font-variant-numeric:tabular-nums; }
-  button { font:inherit; border:1px solid var(--ink); background:var(--ink); color:#fff; padding:7px 14px; border-radius:999px; cursor:pointer; }
-  button.ghost { background:#fff; color:var(--ink); border-color:var(--grid); }
-  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:14px; }
-  .kpi { background:var(--card); border:1px solid var(--grid); border-radius:12px; padding:12px 14px; }
-  .kpi .v { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }
-  .kpi .l { color:var(--ink2); font-size:12.5px; }
-  .kpi .c { font-size:12.5px; margin-top:2px; }
-  .legend { display:flex; gap:16px; font-size:13px; color:var(--ink2); margin:2px 0 6px; flex-wrap:wrap; }
-  .sw { display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:6px; }
-  svg { width:100%; display:block; }
-  .chart-wrap { position:relative; }
-  .tip { position:absolute; pointer-events:none; background:var(--ink); color:#fff; font-size:12px; padding:5px 8px; border-radius:6px; display:none; white-space:nowrap; transform:translate(-50%,-115%); }
-  .day { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; margin-top:14px; }
-  @media (max-width:900px){ .day{ grid-template-columns:1fr; } }
-  .wa { background:#e7f6ec; border-radius:12px 12px 12px 3px; padding:10px 12px; font-size:14.5px; }
-  .tabs { display:flex; gap:6px; margin:8px 0; } .tabs button { padding:3px 10px; font-size:13px; }
-  .tabs button.on { background:var(--ink); color:#fff; } .tabs button:not(.on){ background:#fff; color:var(--ink); border-color:var(--grid); }
-  .status { font-weight:700; } .muted { color:var(--muted); font-size:13px; }
-  details { margin-top:22px; } summary { cursor:pointer; font-weight:600; }
-  code { background:#f2f1ed; padding:1px 5px; border-radius:4px; }
-  footer { color:var(--muted); font-size:13px; margin-top:26px; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--surface); color: var(--ink); }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; padding: 20px 28px 8px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--ink2); }
+  .clock { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink2); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+           background: #eef3fb; color: var(--blue); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; padding: 12px 28px 28px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  .cards { display: grid; gap: 16px; align-content: start; }
+  .card { background: var(--card); border: 1px solid var(--grid); border-radius: 12px; padding: 16px 18px; }
+  .card-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .card-head h2 { font-size: 16px; margin: 0; }
+  .meta { color: var(--muted); font-size: 12.5px; }
+  .pill { margin-left: auto; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1.5px solid currentColor; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 14px 0 6px; }
+  .stat .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .l { color: var(--ink2); font-size: 12px; }
+  .gauge { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 6px; position: relative; overflow: hidden; }
+  .gauge > i { position: absolute; inset: 0 auto 0 0; background: var(--blue); border-radius: 3px; }
+  .msg-now { margin-top: 8px; padding: 8px 10px; background: #f5f5f2; border-radius: 8px; color: var(--ink2); font-size: 13px; }
+  svg.chart { width: 100%; height: 190px; display: block; margin-top: 8px; }
+  .chart-wrap { position: relative; }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; font-size: 12px; padding: 4px 8px;
+         border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); display: none; }
+  aside .card { position: sticky; top: 12px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+  aside h2 { font-size: 16px; margin: 0 0 8px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tabs button { border: 1px solid var(--grid); background: var(--surface); padding: 4px 10px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12.5px; }
+  .tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .feed { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .wa { background: #e7f6ec; border-radius: 10px 10px 10px 2px; padding: 8px 10px; font-size: 13.5px; }
+  .wa .t { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
+  .empty { color: var(--muted); padding: 20px 0; text-align: center; }
+  footer { color: var(--muted); font-size: 12px; padding: 0 28px 24px; }
+
+  .bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:0 28px 6px; }
+  .bar button { font:inherit; font-size:13px; border:1px solid var(--grid); background:#fff; color:var(--ink); padding:5px 12px; border-radius:999px; cursor:pointer; }
+  .bar button.on, .bar button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .bar .sep { width:1px; height:20px; background:var(--grid); margin:0 4px; }
+  .bar a { margin-left:auto; font-size:13.5px; }
+  .progress { height:4px; background:var(--grid); margin:4px 28px 0; border-radius:2px; overflow:hidden; }
+  .progress > i { display:block; height:100%; background:var(--good); width:0; }
+  .intro { margin:4px 28px 0; color:var(--ink2); max-width:900px; }
+  details.raw { margin-top:8px; font-size:12.5px; color:var(--ink2); }
+  details.raw summary { cursor:pointer; }
+  details.raw pre { background:#f5f5f2; padding:8px 10px; border-radius:8px; overflow:auto; margin:6px 0 0; font-size:11.5px; }
+  .offline { color:var(--critical); font-weight:600; }
+  .report { margin:12px 28px 0; }
+  .report table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; font-size:13.5px; }
+  .report th, .report td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--grid); }
+  .report th { color:var(--ink2); font-weight:600; font-size:12.5px; }
   a { color:var(--blue); }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>🌱 KrishiSense simulator</h1>
-  <p class="lede">A solar soil sensor plus weather forecast tells farmers <b>when to irrigate and for how long</b>, on WhatsApp in Odia, Hindi or English.
-    This page simulates a whole season in your browser and compares a farmer who follows KrishiSense with one who waters on a fixed schedule.</p>
-
-  <div class="grid">
-    <div class="card" id="controls">
-      <h2>Your field</h2>
-      <div class="row2">
-        <div><label>Crop</label><select id="crop"></select></div>
-        <div><label>Growth stage</label><select id="stage"><option>initial</option><option>development</option><option selected>mid</option><option>late</option></select></div>
-      </div>
-      <label>Soil</label><select id="soil"></select>
-      <div class="row2">
-        <div><label>Area (m²)</label><input type="number" id="area" value="1000" min="100" step="100"></div>
-        <div><label>Pump flow (L/min)</label><input type="number" id="lpm" value="300" min="20" step="10"></div>
-      </div>
-      <label>Irrigation method</label><select id="method"><option value="furrow">furrow</option><option value="flood">flood</option><option value="sprinkler">sprinkler</option><option value="drip">drip</option></select>
-      <h2 style="margin-top:18px">Season &amp; weather</h2>
-      <label>Season length <span class="val" id="daysV"></span></label><input type="range" id="days" min="20" max="120" value="60">
-      <label>Rainy days <span class="val" id="rainV"></span></label><input type="range" id="rain" min="0" max="50" value="15">
-      <label>Weather year (random seed) <span class="val" id="seedV"></span></label>
-      <div class="row2"><input type="range" id="seed" min="1" max="50" value="7"><button class="ghost" id="newWeather">New weather</button></div>
-      <h2 style="margin-top:18px">Fixed-schedule farmer</h2>
-      <div class="row2">
-        <div><label>Waters every (days)</label><input type="number" id="every" value="3" min="1" max="14"></div>
-        <div><label>for (minutes)</label><input type="number" id="mins" value="90" min="10" step="10"></div>
-      </div>
-      <label>Pump running cost (₹ per hour) <span class="val" id="costV"></span></label><input type="range" id="cost" min="20" max="200" step="5" value="60">
-    </div>
-
-    <div>
-      <div class="kpis" id="kpis"></div>
-      <div class="card">
-        <h2>Soil water through the season</h2>
-        <div class="legend"><span><i class="sw" style="background:var(--blue)"></i>KrishiSense farmer</span>
-          <span><i class="sw" style="background:var(--orange)"></i>Fixed-schedule farmer</span>
-          <span><i class="sw" style="background:var(--serious);height:0;border-top:2px dashed var(--serious)"></i>refill point (below = crop stress)</span></div>
-        <div class="chart-wrap"><svg id="chart" viewBox="0 0 760 250"></svg><div class="tip" id="tip"></div></div>
-        <div class="muted" style="margin-top:4px">Daily rain (mm)</div>
-        <svg id="rainChart" viewBox="0 0 760 70"></svg>
-        <label>Pick a day <span class="val" id="dayV"></span></label><input type="range" id="day" min="0" max="59" value="0">
-        <div class="day">
-          <div id="dayInfo"></div>
-          <div>
-            <div class="tabs" id="tabs"><button data-l="or" class="on">ଓଡ଼ିଆ</button><button data-l="hi">हिन्दी</button><button data-l="en">English</button></div>
-            <div class="wa" id="msg"></div>
-            <div class="muted" style="margin-top:4px">WhatsApp message sent at 07:00</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <details>
-    <summary>How it works</summary>
-    <p>Each hour the model removes the crop's water use, <code>ETc = Kc × ET0</code>, from the root zone. ET0 is estimated with the Hargreaves method from simulated temperatures. Rain and irrigation add water back.
-      At 07:00 KrishiSense compares the root-zone depletion <code>Dr</code> with the crop's readily available water <code>RAW = p × TAW</code> (FAO Irrigation Paper 56):</p>
-    <ul>
-      <li><b>Irrigate now</b> if <code>Dr ≥ RAW</code>: refill to field capacity. Pump minutes = (Dr − expected rain) ÷ efficiency × area ÷ pump flow.</li>
-      <li><b>Skip, rain due</b> if likely rain (amount × probability × 0.8) covers ≥ 60% of the need.</li>
-      <li><b>Irrigate today</b> if today's crop water use will cross the line before tomorrow morning.</li>
-    </ul>
-    <p>The same logic runs in the real KrishiSense server. This page is a simplified, illustrative model with simulated weather. Real savings depend on the field, calibration and the farmer.
-      Source code: <a href="https://github.com/shaswatprof2000-git-hub/krishisense">github.com/shaswatprof2000-git-hub/krishisense</a></p>
-  </details>
-  <footer>KrishiSense · MIT licence · Shaswat Mohanty</footer>
+<header>
+  <h1>🌱 KrishiSense</h1>
+  <span class="sub">Live farm simulation</span>
+  <span class="badge">SIMULATION</span>
+  <span class="clock" id="clock">starting…</span>
+</header>
+<p class="intro">Three virtual solar sensor stations send soil readings every 15 minutes. The KrishiSense advisor decides
+  when to irrigate and for how long, and sends WhatsApp messages in Odia and English. Everything runs in this page:
+  no install, nothing sent to real phones. Farms and weather are simulated.</p>
+<div class="bar" style="margin-top:12px">
+  <button id="play" class="primary">⏸ Pause</button>
+  <span class="sep"></span>
+  <button data-speed="1">1 hour / s</button><button data-speed="6" class="on">6 hours / s</button><button data-speed="24">1 day / s</button>
+  <span class="sep"></span>
+  <button id="restart">↻ New weather</button>
+  <span class="muted" id="day" style="color:var(--muted);font-size:13px"></span>
+  <a href="season.html">Season comparison: KrishiSense vs fixed schedule →</a>
 </div>
+<div class="progress"><i id="prog"></i></div>
+<div class="report card" id="report" hidden></div>
+<main>
+  <section class="cards" id="cards"></section>
+  <aside>
+    <div class="card">
+      <h2>WhatsApp alerts sent</h2>
+      <div class="tabs" id="tabs">
+        <button data-lang="or" class="on">ଓଡ଼ିଆ</button><button data-lang="en">English</button><button data-lang="all">All</button>
+      </div>
+      <div class="feed" id="feed"><div class="empty">No alerts yet</div></div>
+    </div>
+  </aside>
+</main>
+<footer>Soil water = share of plant-available water in the root zone (100% = field capacity, 0% = wilting point).
+The dashed line is the crop's refill point (FAO-56); orange lines are pump runs (by the farmer, or automatic).
+The chilli station loses its network on day 5 from 09:00 to 21:00: watch it buffer readings and the "no sensor data" alert.
+Source: <a href="https://github.com/shaswatprof2000-git-hub/krishisense">github.com/shaswatprof2000-git-hub/krishisense</a> · MIT licence · Shaswat Mohanty</footer>
 
-<script id="core">
-// ===== KS-CORE-START (pure logic, also tested with Node) =====
-const KS = (() => {
-  const CROPS = { // FAO-56: Kc ini/mid/end, max root depth (m), depletion fraction p
-    tomato:[0.60,1.15,0.80,0.7,0.40], brinjal:[0.60,1.05,0.90,0.7,0.45], chilli:[0.60,1.05,0.90,0.5,0.30],
-    maize:[0.30,1.20,0.60,1.0,0.55], groundnut:[0.40,1.15,0.60,0.5,0.50], cabbage:[0.70,1.05,0.95,0.5,0.45],
-    potato:[0.50,1.15,0.75,0.4,0.35], watermelon:[0.40,1.00,0.75,0.8,0.40] };
-  const SOILS = { sandy:[0.12,0.05], sandy_loam:[0.23,0.11], loam:[0.25,0.12], silty_clay_loam:[0.33,0.20], clay:[0.36,0.22] };
-  const EFF = { drip:0.90, sprinkler:0.75, furrow:0.60, flood:0.55 };
-  const ROOT = { initial:0.4, development:0.7, mid:1.0, late:1.0 };
-  function kc(c, stage){ const [i,m,e]=CROPS[c]; return {initial:i, development:(i+m)/2, mid:m, late:e}[stage]; }
-  function rng(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-  function ra(lat, doy){ const phi = lat*Math.PI/180, dr = 1+0.033*Math.cos(2*Math.PI*doy/365), d = 0.409*Math.sin(2*Math.PI*doy/365-1.39);
-    const ws = Math.acos(Math.max(-1, Math.min(1, -Math.tan(phi)*Math.tan(d))));
-    return 0.408*(24*60/Math.PI)*0.082*dr*(ws*Math.sin(phi)*Math.sin(d)+Math.cos(phi)*Math.cos(d)*Math.sin(ws)); }
-  function hargreaves(tmin, tmax, lat, doy){ return Math.max(0, 0.0023*((tmin+tmax)/2+17.8)*Math.sqrt(Math.max(tmax-tmin,0))*ra(lat,doy)); }
-  function weather(seed, days, rainShare, lat = 20.39, startDoy = 60){
-    const out = [];
-    for (let d = 0; d < days + 2; d++){
-      const r = rng(seed*100003 + d*7919); for (let k = 0; k < 3; k++) r();
-      const rains = r() < rainShare;
-      const g = () => -Math.log(1 - r());
-      const rain = rains ? 9*(g()+g()) : 0;                        // gamma(2, 9): mean 18 mm
-      let prob, fRain;
-      if (rains){ if (r() > 0.15){ prob = 60 + 35*r(); } else { prob = 10 + 25*r(); } fRain = rain*(0.6+0.8*r()); }
-      else { const fa = r() < 0.08; prob = fa ? 55+25*r() : 25*r(); fRain = fa ? 8+17*r() : 2*r(); }
-      const doy = startDoy + d, season = Math.sin(2*Math.PI*(doy-80)/365);
-      const tmax = 33 + 4*season + 2.4*(r()-0.5) - (rains?3:0), tmin = 22 + 3*season + 2*(r()-0.5);
-      out.push({ rain, fRain, prob, tmin, tmax, et0: hargreaves(tmin, tmax, lat, doy)*(rains?0.75:1) });
-    }
-    return out;
-  }
-  function advise(f, dr, wToday, wTomorrow){
-    const etc = f.kc*wToday.et0, expRain = 0.8*wToday.fRain*wToday.prob/100;
-    const minutes = net => Math.max(5, 5*Math.round(((net/f.eff)*f.area/f.lpm)/5));
-    if (dr >= f.raw){
-      if (expRain >= 0.6*dr) return { status:"SKIP_RAIN", minutes:0, rain:wToday.fRain, prob:wToday.prob };
-      return { status:"IRRIGATE_NOW", minutes:minutes(dr-expRain), urgent: dr >= 0.85*f.taw, rain:wToday.fRain, prob:wToday.prob };
-    }
-    if (dr + etc - expRain >= f.raw){
-      const rT = 0.8*wTomorrow.fRain*wTomorrow.prob/100;
-      if (rT >= 0.6*(dr+etc-expRain)) return { status:"OK", minutes:0, note:"rain tomorrow", rain:wToday.fRain, prob:wToday.prob };
-      return { status:"IRRIGATE_SOON", minutes:minutes(dr+etc-expRain), rain:wToday.fRain, prob:wToday.prob };
-    }
-    return { status:"OK", minutes:0, rain:wToday.fRain, prob:wToday.prob };
-  }
-  function simulate(p){
-    const [fc, wp] = SOILS[p.soil], zr = CROPS[p.crop][3]*ROOT[p.stage];
-    const f = { taw: 1000*(fc-wp)*zr, kc: kc(p.crop, p.stage), eff: EFF[p.method], area: p.area, lpm: p.lpm };
-    f.raw = CROPS[p.crop][4]*f.taw;
-    const W = weather(p.seed, p.days, p.rainShare);
-    const farmers = { ks:{ avail:0.8*f.taw, litres:0, pumpMin:0, stressH:0, series:[] },
-                      fixed:{ avail:0.8*f.taw, litres:0, pumpMin:0, stressH:0, series:[] } };
-    const days = [];
-    for (let d = 0; d < p.days; d++){
-      const w = W[d];
-      let advice = null;
-      for (let h = 0; h < 24; h++){
-        if (h === 7){
-          advice = advise(f, f.taw - farmers.ks.avail, w, W[d+1]);
-          if (advice.status === "IRRIGATE_NOW" || advice.status === "IRRIGATE_SOON") water(farmers.ks, advice.minutes);
-          if (d % p.every === 0) water(farmers.fixed, p.fixedMinutes);
-        }
-        for (const k of ["ks","fixed"]){
-          const F = farmers[k], sun = Math.max(0, Math.sin(Math.PI*(h+0.5-6)/12));
-          F.avail -= f.kc*w.et0/(24/Math.PI)*sun;
-          if (h === 15) F.avail += 0.8*w.rain;
-          F.avail = Math.min(Math.max(F.avail, 0), 1.1*f.taw);
-          if (f.taw - F.avail > f.raw) F.stressH += 1;
-          if (h % 3 === 0) F.series.push({ t: d + h/24, pct: 100*F.avail/f.taw });
-        }
-      }
-      days.push({ day:d, weather:w, advice, ksPct:100*farmers.ks.avail/f.taw, fixedPct:100*farmers.fixed.avail/f.taw });
-    }
-    function water(F, minutes){ const L = minutes*p.lpm; F.litres += L; F.pumpMin += minutes; F.avail = Math.min(F.avail + L*f.eff/p.area, 1.1*f.taw); }
-    return { field:f, refillPct: 100*(1-CROPS[p.crop][4]), farmers, days, weather:W.slice(0,p.days) };
-  }
-  const T = {
-    or:{ IRRIGATE_NOW:"🌱 ଜଳସେଚନ ଦରକାର। ଆଜି ପମ୍ପ {m} ମିନିଟ୍ ଚଲାନ୍ତୁ। ମାଟି ଆର୍ଦ୍ରତା: {w}%",
-         IRRIGATE_SOON:"🌱 ଆଜି ରାତି ସୁଦ୍ଧା ମାଟି ଶୁଖିଯିବ। ଆଜି ପମ୍ପ ପ୍ରାୟ {m} ମିନିଟ୍ ଚଲାନ୍ତୁ।",
-         SKIP_RAIN:"🌧️ ଜଳସେଚନ କରନ୍ତୁ ନାହିଁ। ଆଗାମୀ 24 ଘଣ୍ଟାରେ ପ୍ରାୟ {r} ମିମି ବର୍ଷା ହେବାର ସମ୍ଭାବନା ({p}%)।",
-         OK:"✅ ମାଟିରେ ଯଥେଷ୍ଟ ଆର୍ଦ୍ରତା ଅଛି ({w}%)। ଆଜି ଜଳସେଚନ ଦରକାର ନାହିଁ।", urgent:"⚠️ ଜରୁରୀ — " },
-    hi:{ IRRIGATE_NOW:"🌱 सिंचाई ज़रूरी है। आज पंप {m} मिनट चलाएँ। मिट्टी की नमी: {w}%",
-         IRRIGATE_SOON:"🌱 आज रात तक मिट्टी सूख जाएगी। आज पंप लगभग {m} मिनट चलाएँ।",
-         SKIP_RAIN:"🌧️ सिंचाई न करें। अगले 24 घंटों में लगभग {r} मिमी बारिश की संभावना ({p}%)।",
-         OK:"✅ मिट्टी में पर्याप्त नमी है ({w}%)। आज सिंचाई की ज़रूरत नहीं।", urgent:"⚠️ तुरंत — " },
-    en:{ IRRIGATE_NOW:"🌱 Irrigation needed. Run the pump for {m} minutes today. Soil water: {w}%",
-         IRRIGATE_SOON:"🌱 Soil will reach the refill point by tonight. Run the pump for about {m} minutes today.",
-         SKIP_RAIN:"🌧️ Don't irrigate. About {r} mm of rain is likely in the next 24 hours ({p}%).",
-         OK:"✅ Soil has enough water ({w}%). No irrigation needed today.", urgent:"⚠️ URGENT — " } };
-  function message(adv, waterPct, lang){
-    const t = T[lang]; let s = t[adv.status].replace("{m}", adv.minutes).replace("{w}", Math.round(waterPct))
-      .replace("{r}", adv.rain.toFixed(1)).replace("{p}", Math.round(adv.prob));
-    return (adv.urgent ? t.urgent : "") + s;
-  }
-  return { CROPS, SOILS, EFF, weather, advise, simulate, message, hargreaves };
-})();
-if (typeof module !== "undefined") module.exports = KS;
-// ===== KS-CORE-END =====
-</script>
-
+<script src="farm-engine.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-for (const c of Object.keys(KS.CROPS)) $("crop").add(new Option(c, c));
-for (const s of Object.keys(KS.SOILS)) $("soil").add(new Option(s.replace(/_/g, " "), s));
-$("soil").value = "loam";
-let lang = "or", R = null;
+const STATUS = {
+  OK:            { label: "✅ Soil OK",            color: "var(--good)" },
+  IRRIGATE_SOON: { label: "⏰ Irrigate tomorrow", color: "var(--warn)" },
+  IRRIGATE_NOW:  { label: "💧 Irrigate now",      color: "var(--serious)" },
+  SKIP_RAIN:     { label: "🌧️ Skip: rain due",    color: "var(--info)" },
+  SENSOR_STALE:  { label: "⚠️ No data",           color: "var(--critical)" },
+  NO_DATA:       { label: "⚠️ No data yet",       color: "var(--critical)" },
+};
+const SEASON_DAYS = 60;
+let lang = "or", farm, speed = 6, playing = true, carry = 0, seed = 7;
+const $ = (s, el = document) => el.querySelector(s);
+const fmtTime = ts => new Date(ts * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const get = path => farm.api(path);   // same calls the live server answers
 
-function params(){
-  return { crop:$("crop").value, stage:$("stage").value, soil:$("soil").value, area:+$("area").value || 1000,
-           lpm:+$("lpm").value || 300, method:$("method").value, days:+$("days").value, rainShare:+$("rain").value/100,
-           seed:+$("seed").value, every:Math.max(1, +$("every").value || 3), fixedMinutes:+$("mins").value || 90 };
+function start(newSeed) {
+  seed = newSeed; farm = new KSFarm.Farm({ seed, days: SEASON_DAYS });
+  farm.run(48);                         // two days of history so the charts are not empty
+  $("#cards").innerHTML = ""; $("#report").hidden = true; carry = 0;
+  setPlaying(true); refresh();
 }
-const fmt = (n, d = 0) => n.toLocaleString("en-IN", { maximumFractionDigits: d, minimumFractionDigits: d });
-
-function kpis(r, p){
-  const ks = r.farmers.ks, fx = r.farmers.fixed, cost = +$("cost").value;
-  const saved = fx.litres > 0 ? 100*(1 - ks.litres/fx.litres) : 0;
-  const cards = [
-    ["Water used", `${fmt(ks.litres/1000,1)} m³`, `fixed schedule: ${fmt(fx.litres/1000,1)} m³`,
-      saved >= 0 ? `${fmt(saved)}% less water` : `${fmt(-saved)}% more water`],
-    ["Pump running cost", `₹${fmt(ks.pumpMin/60*cost)}`, `fixed schedule: ₹${fmt(fx.pumpMin/60*cost)}`, `at ₹${cost}/hour`],
-    ["Hours of crop stress", `${fmt(ks.stressH)} h`, `fixed schedule: ${fmt(fx.stressH)} h`, "soil below the refill point"],
-    ["Root-zone storage", `${fmt(r.field.taw)} mm`, `refill when ${fmt(r.field.raw)} mm used`, `${p.crop}, ${p.soil.replace(/_/g," ")}`],
-  ];
-  $("kpis").innerHTML = cards.map(([l, v, c, n]) =>
-    `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="c">${c}</div><div class="muted">${n}</div></div>`).join("");
+function setPlaying(p) { playing = p; $("#play").textContent = p ? "⏸ Pause" : "▶ Play"; }
+function cardSkeleton(st) {
+  const el = document.createElement("div");
+  el.className = "card"; el.id = "card-" + st.station_id;
+  el.innerHTML = `
+    <div class="card-head"><h2>${esc(st.name)}</h2>
+      <span class="meta">${esc(st.crop)} · ${esc(st.stage)} · ${esc(st.soil.replace(/_/g, " "))} · ${st.area_m2} m² · ${esc(st.irrigation_method)}${st.auto_pump ? " · auto pump" : ""}</span>
+      <span class="pill">…</span></div>
+    <div class="stats">
+      <div class="stat"><div class="v" data-k="water">–</div><div class="l">soil water</div><div class="gauge"><i data-k="gauge"></i></div></div>
+      <div class="stat"><div class="v" data-k="pump">–</div><div class="l">pump time advised</div></div>
+      <div class="stat"><div class="v" data-k="rain">–</div><div class="l">rain forecast (24 h)</div></div>
+      <div class="stat"><div class="v" data-k="etc">–</div><div class="l">crop water use / day</div></div>
+      <div class="stat"><div class="v" data-k="batt">–</div><div class="l">battery · last reading</div></div>
+    </div>
+    <div class="chart-wrap"><svg class="chart" viewBox="0 0 640 190" preserveAspectRatio="none"></svg><div class="tip"></div></div>
+    <div class="msg-now" data-k="msg"></div>
+    <details class="raw"><summary>Last upload from the (virtual) ESP32</summary><pre data-k="raw"></pre></details>`;
+  return el;
 }
 
-function chart(r){
-  const svg = $("chart"), W = 760, H = 250, L = 40, Rr = 10, T = 10, B = 26, n = r.days.length;
-  const x = t => L + (W - L - Rr)*t/n, y = v => T + (H - T - B)*(1 - Math.min(v, 115)/115);
+function drawChart(svg, tip, hist, pumps, refill, clock) {
+  const W = 640, H = 190, L = 34, R = 8, T = 10, B = 22;
+  if (!hist.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#8a8984">no readings yet</text>`; return; }
+  const t0 = hist[0].ts, t1 = Math.max(clock, hist[hist.length - 1].ts), span = Math.max(1, t1 - t0);
+  const x = t => L + (W - L - R) * (t - t0) / span, y = v => T + (H - T - B) * (1 - v / 110);
   let g = "";
-  for (const v of [0, 25, 50, 75, 100]) g += `<line x1="${L}" x2="${W-Rr}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e5e0"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="#8a8984">${v}%</text>`;
-  const step = n > 60 ? 14 : 7;
-  for (let d = 0; d <= n; d += step) g += `<text x="${x(d)}" y="${H-8}" text-anchor="middle" font-size="11" fill="#8a8984">day ${d}</text>`;
-  g += `<line x1="${L}" x2="${W-Rr}" y1="${y(r.refillPct)}" y2="${y(r.refillPct)}" stroke="#c4471f" stroke-dasharray="5 4"/>`;
-  const path = (s, c, w) => `<path d="${s.map((p,i)=>`${i?"L":"M"}${x(p.t).toFixed(1)},${y(p.pct).toFixed(1)}`).join("")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>`;
-  g += path(r.farmers.fixed.series, "#eb6834", 1.8) + path(r.farmers.ks.series, "#2a78d6", 2.2);
-  const dsel = +$("day").value;
-  g += `<line x1="${x(dsel+7/24)}" x2="${x(dsel+7/24)}" y1="${T}" y2="${H-B}" stroke="#0b0b0b" opacity=".35"/>`;
-  g += `<rect x="${L}" y="${T}" width="${W-L-Rr}" height="${H-T-B}" fill="transparent" id="hit"/>`;
+  for (const v of [0, 50, 100]) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e5e0"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#8a8984">${v}%</text>`;
+  const dayMs = 86400, off = 19800;
+  for (let d = Math.ceil((t0 + off) / dayMs) * dayMs - off; d <= t1; d += dayMs) {
+    g += `<line x1="${x(d)}" x2="${x(d)}" y1="${T}" y2="${H - B}" stroke="#f0efea"/>`;
+    g += `<text x="${x(d) + 3}" y="${H - 6}" font-size="10" fill="#8a8984">${new Date(d * 1000).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}</text>`;
+  }
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(refill)}" y2="${y(refill)}" stroke="#c4471f" stroke-dasharray="4 4" stroke-width="1.2"/>`;
+  g += `<text x="${W - R - 2}" y="${y(refill) - 4}" text-anchor="end" font-size="10" fill="#52514e">refill point ${refill}%</text>`;
+  for (const p of pumps) g += `<line x1="${x(p.issued_at)}" x2="${x(p.issued_at)}" y1="${T}" y2="${H - B}" stroke="#eb6834" stroke-width="1.5"><title>${fmtTime(p.issued_at)}: pump ${p.minutes} min (${p.source})</title></line>`;
+  const d = hist.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.water_pct).toFixed(1)}`).join("");
+  g += `<path d="${d}" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>`;
+  g += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="#0b0b0b" stroke-width="1" opacity="0"/><circle class="dot" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2" opacity="0"/>`;
+  g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" class="hit"/>`;
   svg.innerHTML = g;
-  const hit = $("hit"), tip = $("tip");
+  const hit = $(".hit", svg), xh = $(".xh", svg), dot = $(".dot", svg);
   hit.onmousemove = ev => {
-    const b = svg.getBoundingClientRect(), px = (ev.clientX - b.left)*W/b.width;
-    const d = Math.max(0, Math.min(n-1, Math.floor((px - L)/(W - L - Rr)*n)));
-    const D = r.days[d];
-    tip.style.display = "block"; tip.style.left = (x(d+0.5)/W*b.width) + "px"; tip.style.top = (y(Math.max(D.ksPct, D.fixedPct))/H*b.height) + "px";
-    tip.textContent = `day ${d} · KrishiSense ${Math.round(D.ksPct)}% · fixed ${Math.round(D.fixedPct)}% · rain ${D.weather.rain.toFixed(0)} mm`;
+    const box = svg.getBoundingClientRect(), px = (ev.clientX - box.left) * W / box.width;
+    const t = t0 + (px - L) / (W - L - R) * span;
+    let best = hist[0]; for (const p of hist) if (Math.abs(p.ts - t) < Math.abs(best.ts - t)) best = p;
+    xh.setAttribute("x1", x(best.ts)); xh.setAttribute("x2", x(best.ts)); xh.setAttribute("opacity", .35);
+    dot.setAttribute("cx", x(best.ts)); dot.setAttribute("cy", y(best.water_pct)); dot.setAttribute("opacity", 1);
+    tip.style.display = "block";
+    tip.style.left = (x(best.ts) / W * box.width) + "px"; tip.style.top = (y(best.water_pct) / H * box.height) + "px";
+    tip.textContent = `${fmtTime(best.ts)} · soil water ${best.water_pct}% · ${best.air_temp_c ?? "–"} °C`;
   };
-  hit.onmouseleave = () => tip.style.display = "none";
-  hit.onclick = ev => { const b = svg.getBoundingClientRect(), px = (ev.clientX - b.left)*W/b.width;
-    $("day").value = Math.max(0, Math.min(n-1, Math.floor((px - L)/(W - L - Rr)*n))); showDay(); chart(R); };
-  // rain bars
-  const rs = $("rainChart"), maxR = Math.max(20, ...r.weather.map(w => w.rain));
-  let rg = `<line x1="${L}" x2="${W-Rr}" y1="60" y2="60" stroke="#e6e5e0"/>`;
-  r.weather.forEach((w, d) => { if (w.rain > 0) { const h = 52*w.rain/maxR;
-    rg += `<rect x="${x(d)+1}" y="${60-h}" width="${Math.max(2,(W-L-Rr)/n-2)}" height="${h}" fill="#2a78d6" opacity=".55" rx="1"/>`; } });
-  rg += `<text x="${L-6}" y="12" text-anchor="end" font-size="10" fill="#8a8984">${Math.round(maxR)}</text>`;
-  rs.innerHTML = rg;
+  hit.onmouseleave = () => { tip.style.display = "none"; xh.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); };
 }
 
-const LABEL = { OK:["✅ Soil OK","var(--good)"], IRRIGATE_SOON:["⏰ Irrigate today (before it dries)","var(--warn)"],
-                IRRIGATE_NOW:["💧 Irrigate now","var(--serious)"], SKIP_RAIN:["🌧️ Skip: rain due","var(--info)"] };
-function showDay(){
-  const d = +$("day").value, D = R.days[d], a = D.advice;
-  $("dayV").textContent = `day ${d}`;
-  const [lab, col] = LABEL[a.status];
-  const morningPct = R.farmers.ks.series[d*8 + 2] ? R.farmers.ks.series[d*8 + 2].pct : D.ksPct;
-  $("dayInfo").innerHTML = `<div class="status" style="color:${col}">${lab}${a.urgent ? " · urgent" : ""}</div>
-    <p style="margin:6px 0">Morning soil water: <b>${Math.round(morningPct)}%</b> (refill point ${Math.round(R.refillPct)}%).
-    Forecast: <b>${a.rain.toFixed(1)} mm</b> at ${Math.round(a.prob)}% chance. It actually rained <b>${D.weather.rain.toFixed(1)} mm</b>.</p>
-    <p class="muted" style="margin:0">Crop water use today ≈ ${(R.field.kc*D.weather.et0).toFixed(1)} mm (ET0 ${D.weather.et0.toFixed(1)} mm, ${D.weather.tmin.toFixed(0)}–${D.weather.tmax.toFixed(0)} °C).
-    ${a.minutes ? `Pump time = water needed ÷ ${KS.EFF[$("method").value]} efficiency × ${$("area").value} m² ÷ ${$("lpm").value} L/min.` : ""}</p>`;
-  $("msg").textContent = KS.message(a, morningPct, lang);
+function refresh() {
+  const info = get("/api/v1/stations");
+  const day = KSFarm.simDay(info.clock) + 1;
+  $("#clock").textContent = "Simulated time: " + fmtTime(info.clock);
+  $("#day").textContent = `Day ${Math.min(day, SEASON_DAYS)} of ${SEASON_DAYS} · weather #${seed}`;
+  $("#prog").style.width = Math.min(100, 100 * (info.clock - KSFarm.SIM_EPOCH) / (SEASON_DAYS * 86400)) + "%";
+  const cards = $("#cards");
+  for (const st of info.stations) {
+    let el = document.getElementById("card-" + st.station_id);
+    if (!el) { el = cardSkeleton(st); cards.appendChild(el); }
+    const adv = get(`/api/v1/advice?station_id=${st.station_id}`);
+    const hist = get(`/api/v1/history?station_id=${st.station_id}&days=7`);
+    const pumps = get(`/api/v1/pump?station_id=${st.station_id}&days=7`);
+    const s = STATUS[adv.status] || { label: adv.status, color: "var(--ink2)" };
+    const pill = $(".pill", el); pill.textContent = s.label + (adv.urgent ? " · URGENT" : ""); pill.style.color = s.color;
+    const w = adv.available_water_pct;
+    $('[data-k="water"]', el).textContent = w == null ? "–" : w + "%";
+    $('[data-k="gauge"]', el).style.width = Math.min(100, w || 0) + "%";
+    $('[data-k="pump"]', el).textContent = adv.pump_minutes ? adv.pump_minutes + " min" : "–";
+    $('[data-k="rain"]', el).textContent = `${adv.rain_next_24h_mm} mm · ${Math.round(adv.rain_prob_pct)}%`;
+    $('[data-k="etc"]', el).textContent = adv.etc_mm_day == null ? "–" : adv.etc_mm_day + " mm";
+    $('[data-k="batt"]', el).textContent = `${adv.battery_v ?? "–"} V · ${adv.hours_since_reading ?? "–"} h`;
+    const f = farm.fields[st.station_id];
+    const net = f.online === false ? `<span class="offline">📵 Network down: ${f.buffer.length} readings waiting in the station's memory.</span> ` : "";
+    $('[data-k="msg"]', el).innerHTML = net + esc(adv.notes && adv.notes.length ? "Note: " + adv.notes.join("; ") : "");
+    $('[data-k="raw"]', el).textContent = f.lastUpload
+      ? `POST /api/v1/readings   (X-Device-Key: ••••)\n` + JSON.stringify({ ...f.lastUpload, sent: undefined }, null, 1) +
+        (f.lastUpload.sent > 1 ? `\n(+ ${f.lastUpload.sent - 1} buffered readings sent in the same upload)` : "")
+      : "no upload yet";
+    drawChart($("svg", el), $(".tip", el), hist, pumps, st.refill_line_pct, info.clock);
+  }
+  const alerts = get("/api/v1/alerts?limit=60");
+  const isOdia = t => /[\u0B00-\u0B7F]/.test(t);
+  const shown = alerts.filter(a => lang === "all" || (lang === "or") === isOdia(a.text));
+  $("#feed").innerHTML = shown.length ? shown.map(a =>
+    `<div class="wa">${esc(a.text)}<div class="t">${fmtTime(a.sent_at)} → ${esc(a.recipient)}</div></div>`).join("")
+    : `<div class="empty">No alerts yet</div>`;
+  if (farm.finished) showReport();
+}
+function showReport() {
+  if (!$("#report").hidden) return;
+  setPlaying(false);
+  const rows = farm.summary().map(r => `<tr><td>${esc(r.name)}</td><td>${r.water_m3} m³</td><td>${r.pump_runs}</td><td>${r.rain_mm} mm</td>
+    <td>${r.stress_hours} h</td><td>${r.max_buffered_readings}</td></tr>`).join("");
+  $("#report").innerHTML = `<h2 style="margin:0 0 8px;font-size:16px">Season report: ${SEASON_DAYS} simulated days</h2>
+    <table><tr><th>Field</th><th>Water pumped</th><th>Pump runs</th><th>Rain</th><th>Hours below refill point</th><th>Most readings buffered offline</th></tr>${rows}</table>
+    <p class="meta" style="margin:8px 0 0">Simulated, illustrative numbers. Press "New weather" to run another season.</p>`;
+  $("#report").hidden = false;
 }
 
-function update(){
-  const p = params();
-  $("daysV").textContent = p.days + " days"; $("rainV").textContent = Math.round(p.rainShare*100) + "%";
-  $("seedV").textContent = "#" + p.seed; $("costV").textContent = "₹" + $("cost").value;
-  $("day").max = p.days - 1; if (+$("day").value > p.days - 1) $("day").value = p.days - 1;
-  R = KS.simulate(p); kpis(R, p); chart(R); showDay();
+let last = performance.now(), lastDraw = 0;
+function loop(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now;
+  if (playing && !farm.finished) {
+    carry += dt * speed * 3600;
+    while (carry >= KSFarm.STEP_S && farm.tick()) carry -= KSFarm.STEP_S;
+  }
+  if (now - lastDraw > 400) { lastDraw = now; refresh(); }
+  requestAnimationFrame(loop);
 }
-document.querySelectorAll("#controls input, #controls select").forEach(el => el.addEventListener("input", update));
-$("newWeather").onclick = () => { $("seed").value = 1 + Math.floor(Math.random()*50); update(); };
-$("day").addEventListener("input", () => { showDay(); chart(R); });
-$("tabs").onclick = e => { if (!e.target.dataset.l) return; lang = e.target.dataset.l;
-  for (const b of $("tabs").children) b.classList.toggle("on", b === e.target); showDay(); };
-// start on the first day with an irrigation message, so visitors see one immediately
-update();
-const firstNow = R.days.findIndex(d => d.advice.status !== "OK");
-if (firstNow >= 0) { $("day").value = firstNow; showDay(); chart(R); }
+$("#play").onclick = () => { if (farm.finished) start(seed); else setPlaying(!playing); };
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
+  speed = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b));
+});
+$("#restart").onclick = () => start(1 + Math.floor(Math.random() * 999));
+$("#tabs").onclick = e => {
+  if (!e.target.dataset.lang) return;
+  lang = e.target.dataset.lang;
+  for (const b of $("#tabs").children) b.classList.toggle("on", b === e.target);
+  refresh();
+};
+start(7);
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>

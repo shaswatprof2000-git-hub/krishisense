@@ -30,8 +30,11 @@ cd ../firmware && pio run -e esp32dev -t upload
   `simworld.py` (seeded weather + imperfect forecasts, simulated clock),
   `virtual_station.py` (virtual ESP32 stations, field water model, offline buffer, farmer behaviour),
   `dashboard.html` (live dashboard served at `/`).
-- `docs/index.html`: public browser simulator (GitHub Pages). Core logic between the KS-CORE markers,
-  tested by `docs/simulator.test.js`.
+- `docs/` (GitHub Pages site, opens from the link with no install):
+  `index.html` live farm dashboard driven by `farm-engine.js` (JS port of virtual stations + advisor +
+  alert rules, answering the same /api/v1 paths as the server); `season.html` KrishiSense vs fixed-schedule
+  comparison (core between the KS-CORE markers). Both tested by `docs/simulator.test.js`.
+- Keep `farm-engine.js` in step with `advisor.py`, `messages.py` and `service.py` when those change.
 
 ## Rules
 
