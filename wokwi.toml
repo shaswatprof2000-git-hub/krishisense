@@ -1,0 +1,8 @@
+# Wokwi simulator for VS Code: runs the real KrishiSense firmware on a virtual ESP32.
+# 1. Build:  cd firmware && pio run -e wokwi
+# 2. Start the server:  cd server && python -m krishisense --config stations.wokwi.json --db wokwi.db serve
+# 3. VS Code: F1 -> "Wokwi: Start Simulator". Move the sliders to wet or dry the soil.
+[wokwi]
+version = 1
+firmware = 'firmware/.pio/build/wokwi/firmware.bin'
+elf = 'firmware/.pio/build/wokwi/firmware.elf'

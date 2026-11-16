@@ -17,6 +17,8 @@ python -m krishisense sim --fast   # season report only
 python -m krishisense serve        # API + status page on :8080 (needs stations.json)
 python -m krishisense advise --send
 cd ../firmware && pio run -e esp32dev -t upload
+pio run -e wokwi                   # virtual board; then F1 -> "Wokwi: Start Simulator" (diagram.json)
+python -m krishisense --config stations.wokwi.json --db wokwi.db serve   # server the Wokwi board uploads to
 ```
 
 ## Layout
@@ -30,6 +32,11 @@ cd ../firmware && pio run -e esp32dev -t upload
   `simworld.py` (seeded weather + imperfect forecasts, simulated clock),
   `virtual_station.py` (virtual ESP32 stations, field water model, offline buffer, farmer behaviour),
   `dashboard.html` (live dashboard served at `/`).
+- Wokwi: `wokwi.toml` + `diagram.json` (repo root), `firmware/include/config.wokwi.h` (env `wokwi`:
+  DHT22 instead of BME280, 15 s interval, host.wokwi.internal:8080, pump enabled at 1 s per minute),
+  `server/stations.wokwi.json` (station `wokwi-01`, key `wokwi-demo-key`).
+- `.vscode/`: recommended extensions + tasks (build Wokwi firmware, server for Wokwi, simulation, tests).
+- `docs/farm3d.html`: three.js 3D view (CDN, pinned 0.170.0) driven by `farm-engine.js`.
 - `docs/` (GitHub Pages site, opens from the link with no install):
   `index.html` live farm dashboard driven by `farm-engine.js` (JS port of virtual stations + advisor +
   alert rules, answering the same /api/v1 paths as the server); `season.html` KrishiSense vs fixed-schedule
@@ -48,4 +55,4 @@ cd ../firmware && pio run -e esp32dev -t upload
 
 ## Roadmap
 
-Wokwi virtual ESP32 in VS Code; field-test near Phulnakhara; phase 2 pump relay + NPK + LoRa; paddy AWD mode; Odia voice alerts.
+field-test near Phulnakhara; phase 2 pump relay + NPK + LoRa; paddy AWD mode; Odia voice alerts.

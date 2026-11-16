@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KrishiSense · 3D farm</title>
+<meta name="description" content="KrishiSense in 3D: three simulated farms with solar soil stations, a Raspberry Pi gateway, pumps, rain and WhatsApp advice, running in your browser.">
+<style>
+  :root { --ink:#0b0b0b; --muted:#8a8984; --good:#1a8a5c; --warn:#b47c00; --serious:#c4471f; --critical:#a3122b; --info:#2a78d6; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#0d1520; font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); }
+  #scene { position:fixed; inset:0; }
+  .panel { position:fixed; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.18); }
+  #hud { top:14px; left:14px; padding:12px 14px; max-width:420px; }
+  #hud h1 { font-size:18px; margin:0; }
+  #hud .sub { color:#52514e; font-size:12.5px; margin:2px 0 8px; }
+  #clock { font-variant-numeric:tabular-nums; font-weight:600; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px; }
+  button { font:inherit; font-size:12.5px; border:1px solid #d9d8d2; background:#fff; color:var(--ink); padding:4px 10px; border-radius:999px; cursor:pointer; }
+  button.on, button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+  a { color:var(--info); }
+  .nav { font-size:12.5px; margin-top:8px; }
+  #weather { font-size:12.5px; color:#52514e; margin-top:6px; }
+  #toast { right:14px; bottom:14px; width:340px; padding:10px 12px; }
+  #toast h2 { font-size:13px; margin:0 0 6px; color:#52514e; font-weight:600; }
+  .wa { background:#e7f6ec; border-radius:10px 10px 10px 2px; padding:7px 9px; font-size:13px; margin-top:6px; }
+  .wa .t { color:var(--muted); font-size:11px; margin-top:2px; }
+  #legend { left:14px; bottom:14px; padding:10px 12px; font-size:12px; color:#52514e; max-width:300px; }
+  .sw { display:inline-block; width:22px; height:9px; border-radius:3px; vertical-align:middle; margin-right:5px; }
+  .label { position:fixed; transform:translate(-50%,-100%); pointer-events:none; background:rgba(255,255,255,.93); border-radius:10px;
+           padding:5px 9px; font-size:12px; white-space:nowrap; box-shadow:0 3px 12px rgba(0,0,0,.2); }
+  .label b { font-size:12.5px; }
+  .label .st { font-weight:700; }
+  .label .bar { height:5px; background:#e6e5e0; border-radius:3px; margin-top:3px; overflow:hidden; }
+  .label .bar i { display:block; height:100%; background:var(--info); }
+  #loading { position:fixed; inset:0; display:grid; place-items:center; color:#fff; font-size:15px; text-align:center; padding:20px; }
+  @media (max-width:700px){ #toast{ width:auto; left:14px; } #legend{ display:none; } #hud{ right:14px; max-width:none; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="scene"></div>
+<div id="loading">Loading the 3D farm…</div>
+<div id="labels"></div>
+
+<div id="hud" class="panel">
+  <h1>🌱 KrishiSense · 3D farm</h1>
+  <div class="sub">Three simulated fields near Phulnakhara. Solar sensor stations report every 15 minutes to a
+    Raspberry Pi gateway; the advisor decides when to water. Drag to orbit, scroll to zoom.</div>
+  <div>Simulated time: <span id="clock">–</span> · <span id="day"></span></div>
+  <div id="weather"></div>
+  <div class="row">
+    <button id="play" class="primary">⏸ Pause</button>
+    <button data-speed="0.5">30 min/s</button><button data-speed="2" class="on">2 h/s</button><button data-speed="6">6 h/s</button>
+    <button id="restart">↻ New weather</button>
+    <button id="spin">⟳ Auto-orbit</button>
+  </div>
+  <div class="nav"><a href="./">Live dashboard</a> · <a href="season.html">Season comparison</a> ·
+    <a href="https://github.com/shaswatprof2000-git-hub/krishisense">Source code</a></div>
+</div>
+
+<div id="legend" class="panel">
+  <div><span class="sw" style="background:linear-gradient(90deg,#d7b98f,#5a3a22)"></span>soil colour: dry → wet</div>
+  <div style="margin-top:3px"><span class="sw" style="background:linear-gradient(90deg,#c9b54a,#2f8f3a)"></span>crop colour: stressed → healthy</div>
+  <div style="margin-top:3px">🔵 water from the pump · 🟢 station LED = upload · 🔴 = no network</div>
+  <div style="margin-top:3px">Glowing dots = readings travelling to the Raspberry Pi gateway</div>
+  <div style="margin-top:6px;color:#8a8984">Simulated, illustrative farms and weather.</div>
+</div>
+
+<div id="toast" class="panel"><h2>Latest WhatsApp alerts</h2><div id="msgs"><div class="wa">No alerts yet</div></div></div>
+
+<script src="farm-engine.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const $ = s => document.querySelector(s);
+const SEASON_DAYS = 60;
+const fmtTime = ts => new Date(ts * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const STATUS = { OK: ["✅ Soil OK", "var(--good)"], IRRIGATE_SOON: ["⏰ Irrigate tomorrow", "var(--warn)"],
+  IRRIGATE_NOW: ["💧 Irrigate now", "var(--serious)"], SKIP_RAIN: ["🌧️ Skip: rain due", "var(--info)"],
+  SENSOR_STALE: ["⚠️ No data", "var(--critical)"], NO_DATA: ["⚠️ No data yet", "var(--critical)"] };
+
+// ---------------------------------------------------------------- renderer, scene, camera
+const host = $("#scene");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+host.appendChild(renderer.domElement);
+$("#loading").remove();
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xbfd8ee, 90, 230);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 600);
+camera.position.set(-38, 34, 58);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 2);
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.47; controls.minDistance = 18; controls.maxDistance = 150;
+
+const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5b4a33, 0.8); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2dc, 2.4);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 260 });
+sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -0.0004; scene.add(sun); scene.add(sun.target);
+
+// sky dome with a vertical gradient
+const skyU = { top: { value: new THREE.Color(0x4f8fd6) }, bottom: { value: new THREE.Color(0xdcebf7) } };
+const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyU,
+  vertexShader: "varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+  fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying float h; void main(){ gl_FragColor = vec4(mix(bottom, top, clamp(h*1.6,0.0,1.0)),1.0); }" }));
+scene.add(sky);
+const stars = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(
+  Array.from({ length: 1800 }, (_, i) => { const t = Math.random() * Math.PI * 2, p = Math.random() * 0.45 * Math.PI, r = 380;
+    return i % 3 === 0 ? r * Math.cos(p) * Math.cos(t) : i % 3 === 1 ? r * Math.sin(p) + 10 : r * Math.cos(p) * Math.sin(t); }), 3)),
+  new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false }));
+scene.add(stars);
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 12), new THREE.MeshBasicMaterial({ color: 0xfff1c4, fog: false }));
+scene.add(sunDisc);
+
+// ---------------------------------------------------------------- terrain
+const grassGeo = new THREE.PlaneGeometry(320, 320, 80, 80); grassGeo.rotateX(-Math.PI / 2);
+{ const pos = grassGeo.attributes.position, col = [];
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), d = Math.hypot(x, z);
+    pos.setY(i, d > 60 ? Math.sin(x * 0.05) * Math.cos(z * 0.04) * Math.min(6, (d - 60) * 0.08) - 0.05 : -0.05);
+    const g = 0.45 + 0.12 * Math.sin(x * 0.3 + z * 0.17) + 0.06 * Math.random();
+    col.push(0.25 * g, 0.55 * g, 0.18 * g);
+  }
+  grassGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); grassGeo.computeVertexNormals(); }
+const grass = new THREE.Mesh(grassGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+grass.receiveShadow = true; scene.add(grass);
+
+// a pond and a few trees for context
+const pond = new THREE.Mesh(new THREE.CircleGeometry(9, 40), new THREE.MeshStandardMaterial({ color: 0x3d7fb0, roughness: 0.15, metalness: 0.1 }));
+pond.rotation.x = -Math.PI / 2; pond.position.set(44, 0.02, -26); scene.add(pond);
+function tree(x, z, s = 1) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * s, 0.5 * s, 4 * s, 8), new THREE.MeshStandardMaterial({ color: 0x6b4a2b }));
+  trunk.position.y = 2 * s; trunk.castShadow = true; g.add(trunk);
+  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.6 * s, 1), new THREE.MeshStandardMaterial({ color: 0x2f6b2f, flatShading: true }));
+  crown.position.y = 5.2 * s; crown.castShadow = true; g.add(crown);
+  g.position.set(x, 0, z); scene.add(g);
+}
+[[-52, -30, 1.3], [-46, -36, 1], [52, 14, 1.2], [58, 22, 1], [-60, 18, 1.1], [30, -44, 1.4], [-20, -46, 1.2], [8, 44, 1]].forEach(a => tree(...a));
+
+// dirt track
+const track = new THREE.Mesh(new THREE.PlaneGeometry(6, 120), new THREE.MeshStandardMaterial({ color: 0xa48a63, roughness: 1 }));
+track.rotation.x = -Math.PI / 2; track.position.set(0, 0.01, 22); track.rotation.z = Math.PI / 2; track.receiveShadow = true; scene.add(track);
+
+// ---------------------------------------------------------------- farm data
+let farm, seed = 7, speed = 2, playing = true, carry = 0, spin = false;
+const PLOT_W = 22, PLOT_D = 16;
+const LAYOUT = { "sim-tomato": [-26, 0], "sim-groundnut": [0, 0], "sim-chilli": [26, 0] };
+const CROP_STYLE = {
+  tomato:    { h: 1.6, leaf: 0.55, fruit: 0xd8342a, fruitN: 3, rows: 7, perRow: 11 },
+  groundnut: { h: 0.6, leaf: 0.5, fruit: null, fruitN: 0, rows: 9, perRow: 14 },
+  chilli:    { h: 1.1, leaf: 0.42, fruit: 0xc81e1e, fruitN: 4, rows: 8, perRow: 13 } };
+const DRY = new THREE.Color(0xd7b98f), WET = new THREE.Color(0x4f331e);
+const SICK = new THREE.Color(0xc9b54a), HEALTHY = new THREE.Color(0x2f8f3a);
+
+// gateway hut (Raspberry Pi) behind the plots
+const GATEWAY = new THREE.Vector3(0, 0, -20);
+{ const g = new THREE.Group();
+  const hut = new THREE.Mesh(new THREE.BoxGeometry(6, 3.6, 4.5), new THREE.MeshStandardMaterial({ color: 0xe9e2d3 }));
+  hut.position.y = 1.8; hut.castShadow = hut.receiveShadow = true; g.add(hut);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(4.8, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x8e3b2c, flatShading: true }));
+  roof.position.y = 4.7; roof.rotation.y = Math.PI / 4; roof.castShadow = true; g.add(roof);
+  const pi = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.25, 1.1), new THREE.MeshStandardMaterial({ color: 0x1f7a3a, roughness: 0.6 }));
+  pi.position.set(0, 1.2, 2.3); g.add(pi);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.6 }));
+  mast.position.set(2.2, 6, -1.2); g.add(mast);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8), new THREE.MeshStandardMaterial({ color: 0xff5a36, emissive: 0xff5a36, emissiveIntensity: 1.5 }));
+  tip.position.set(2.2, 9.1, -1.2); g.add(tip);
+  g.position.copy(GATEWAY); scene.add(g);
+  GATEWAY.set(GATEWAY.x + 2.2, 9, GATEWAY.z - 1.2);
+}
+
+const plots = {};
+function buildPlot(st) {
+  const [cx, cz] = LAYOUT[st.station_id], style = CROP_STYLE[st.crop], g = new THREE.Group();
+  g.position.set(cx, 0, cz);
+  const soilMat = new THREE.MeshStandardMaterial({ color: DRY.clone(), roughness: 0.95 });
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(PLOT_W, 0.5, PLOT_D), soilMat);
+  bed.position.y = 0.25; bed.receiveShadow = true; g.add(bed);
+  // ridges between rows
+  const ridgeGeo = new THREE.BoxGeometry(PLOT_W - 1, 0.35, 0.5);
+  for (let r = 0; r <= style.rows; r++) {
+    const ridge = new THREE.Mesh(ridgeGeo, soilMat); ridge.position.set(0, 0.6, -PLOT_D / 2 + 1 + r * (PLOT_D - 2) / style.rows);
+    ridge.receiveShadow = true; g.add(ridge);
+  }
+  // furrow water (tomato) / drip lines (groundnut) / sprinkler heads (chilli)
+  const waterMat = new THREE.MeshStandardMaterial({ color: 0x3a8fd6, transparent: true, opacity: 0, roughness: 0.1, metalness: 0.1 });
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(PLOT_W - 1.2, PLOT_D - 1.2), waterMat);
+  water.rotation.x = -Math.PI / 2; water.position.y = 0.56; g.add(water);
+  if (st.irrigation_method === "drip") {
+    const pipeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+    for (let r = 0; r < style.rows; r++) {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, PLOT_W - 2, 6), pipeMat);
+      pipe.rotation.z = Math.PI / 2; pipe.position.set(0, 0.62, -PLOT_D / 2 + 1 + (r + 0.5) * (PLOT_D - 2) / style.rows); g.add(pipe);
+    }
+  }
+  const heads = [];
+  if (st.irrigation_method === "sprinkler") {
+    for (const [hx, hz] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) {
+      const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0x777777 }));
+      riser.position.set(hx, 1.3, hz); g.add(riser); heads.push(new THREE.Vector3(cx + hx, 2.2, cz + hz));
+    }
+  }
+  // crops: instanced stems + leaf clusters + fruit
+  const n = style.rows * style.perRow;
+  const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.08, 1, 5), new THREE.MeshStandardMaterial({ color: 0x4b6b2a }), n);
+  const leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.8 }), n);
+  const fruitN = n * style.fruitN;
+  const fruits = fruitN ? new THREE.InstancedMesh(new THREE.SphereGeometry(st.crop === "chilli" ? 0.09 : 0.14, 8, 6),
+    new THREE.MeshStandardMaterial({ color: style.fruit, roughness: 0.4 }), fruitN) : null;
+  leaves.castShadow = true; stems.castShadow = true;
+  const plants = [], rnd = (() => { let s = st.station_id.length * 99; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  for (let r = 0; r < style.rows; r++) for (let k = 0; k < style.perRow; k++) {
+    const x = -PLOT_W / 2 + 1.4 + k * (PLOT_W - 2.8) / (style.perRow - 1) + (rnd() - 0.5) * 0.3;
+    const z = -PLOT_D / 2 + 1 + (r + 0.5) * (PLOT_D - 2) / style.rows + (rnd() - 0.5) * 0.2;
+    plants.push({ x, z, s: 0.85 + rnd() * 0.3, rot: rnd() * Math.PI * 2, fruit: Array.from({ length: style.fruitN }, () => [rnd() - 0.5, rnd(), rnd() - 0.5]) });
+  }
+  g.add(stems, leaves); if (fruits) g.add(fruits);
+  // sensor station: pole, solar panel, enclosure, LED, probes
+  const station = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.7, roughness: 0.35 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 4, 8), metal); pole.position.y = 2; pole.castShadow = true; station.add(pole);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.2), new THREE.MeshStandardMaterial({ color: 0x1b2f5e, metalness: 0.5, roughness: 0.25 }));
+  panel.position.set(0, 4.1, 0); panel.rotation.x = -0.35; panel.castShadow = true; station.add(panel);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), new THREE.MeshStandardMaterial({ color: 0xf4f4f0 }));
+  box.position.set(0, 2.4, 0.32); box.castShadow = true; station.add(box);
+  const ledMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0 });
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), ledMat); led.position.set(0.25, 2.75, 0.58); station.add(led);
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 5), metal); ant.position.set(-0.3, 3.5, 0.3); station.add(ant);
+  station.position.set(PLOT_W / 2 - 1.2, 0.5, -PLOT_D / 2 + 1.2); g.add(station);
+  // pump house + pipe
+  const pumpHouse = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 2), new THREE.MeshStandardMaterial({ color: 0x7c8a6a }));
+  pumpHouse.position.set(-PLOT_W / 2 - 2.2, 0.9, PLOT_D / 2 - 2); pumpHouse.castShadow = true; g.add(pumpHouse);
+  const pumpLampMat = new THREE.MeshStandardMaterial({ color: 0x3a8fd6, emissive: 0x3a8fd6, emissiveIntensity: 0 });
+  const pumpLamp = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), pumpLampMat); pumpLamp.position.set(-PLOT_W / 2 - 2.2, 2.05, PLOT_D / 2 - 2); g.add(pumpLamp);
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 3, 8), new THREE.MeshStandardMaterial({ color: 0x2b6cb0 }));
+  pipe.rotation.z = Math.PI / 2; pipe.position.set(-PLOT_W / 2 - 0.4, 0.5, PLOT_D / 2 - 2); g.add(pipe);
+  scene.add(g);
+  // label
+  const label = document.createElement("div"); label.className = "label"; $("#labels").appendChild(label);
+  plots[st.station_id] = { st, style, g, soilMat, waterMat, stems, leaves, fruits, plants, ledMat, pumpLampMat, label, heads,
+    stationWorld: new THREE.Vector3(cx + PLOT_W / 2 - 1.2, 4.6, cz - PLOT_D / 2 + 1.2), lastUploads: 0, ledUntil: 0, cx, cz };
+}
+
+const dummy = new THREE.Object3D(), tmpC = new THREE.Color();
+function updatePlants(p, health, wilt) {
+  const { plants, style, stems, leaves, fruits } = p;
+  tmpC.copy(SICK).lerp(HEALTHY, health);
+  let fi = 0;
+  plants.forEach((pl, i) => {
+    const h = style.h * pl.s * (0.75 + 0.25 * health);
+    dummy.position.set(pl.x, 0.6 + h / 2, pl.z); dummy.rotation.set(wilt * 0.35, pl.rot, 0); dummy.scale.set(1, h, 1); dummy.updateMatrix();
+    stems.setMatrixAt(i, dummy.matrix);
+    const l = style.leaf * pl.s * (0.8 + 0.2 * health);
+    dummy.position.set(pl.x, 0.6 + h * (1 - 0.15 * wilt), pl.z); dummy.rotation.set(0, pl.rot, 0);
+    dummy.scale.set(l * 1.15, l * (p.st.crop === "groundnut" ? 0.55 : 1) * (1 - 0.3 * wilt), l * 1.15); dummy.updateMatrix();
+    leaves.setMatrixAt(i, dummy.matrix); leaves.setColorAt(i, tmpC);
+    if (fruits) for (const f of pl.fruit) {
+      dummy.position.set(pl.x + f[0] * l * 1.4, 0.6 + h * (0.55 + 0.45 * f[1]), pl.z + f[2] * l * 1.4);
+      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, p.st.crop === "chilli" ? 2.6 : 1, 1); dummy.updateMatrix();
+      fruits.setMatrixAt(fi++, dummy.matrix);
+    }
+  });
+  stems.instanceMatrix.needsUpdate = true; leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true;
+  if (fruits) fruits.instanceMatrix.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- particles: rain, spray, data packets
+const RAIN_N = 4000;
+const rainGeo = new THREE.BufferGeometry();
+const rainPos = new Float32Array(RAIN_N * 3);
+for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = (Math.random() - 0.5) * 140; rainPos[i * 3 + 1] = Math.random() * 50; rainPos[i * 3 + 2] = (Math.random() - 0.5) * 100; }
+rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0xaecdf2, size: 0.28, transparent: true, opacity: 0 }));
+scene.add(rain);
+
+const SPRAY_N = 1500;
+const sprayGeo = new THREE.BufferGeometry(), sprayPos = new Float32Array(SPRAY_N * 3), sprayVel = new Float32Array(SPRAY_N * 3), sprayOwner = new Array(SPRAY_N).fill(null);
+sprayGeo.setAttribute("position", new THREE.BufferAttribute(sprayPos, 3));
+const spray = new THREE.Points(sprayGeo, new THREE.PointsMaterial({ color: 0x5fb0ff, size: 0.22, transparent: true, opacity: 0.9 }));
+spray.frustumCulled = false; scene.add(spray);
+for (let i = 0; i < SPRAY_N; i++) sprayPos[i * 3 + 1] = -100;
+
+const packets = [];
+const packetGeo = new THREE.SphereGeometry(0.28, 10, 8);
+function sendPacket(from, color = 0x7cf0a8) {
+  const m = new THREE.Mesh(packetGeo, new THREE.MeshBasicMaterial({ color })); scene.add(m);
+  const mid = from.clone().lerp(GATEWAY, 0.5); mid.y += 8;
+  packets.push({ m, curve: new THREE.QuadraticBezierCurve3(from.clone(), mid, GATEWAY.clone()), t: 0 });
+}
+
+// ---------------------------------------------------------------- simulation control
+function start(newSeed) {
+  seed = newSeed; farm = new KSFarm.Farm({ seed, days: SEASON_DAYS }); farm.run(6); carry = 0;
+  for (const p of Object.values(plots)) p.lastUploads = farm.fields[p.st.station_id].totals.uploads;
+  setPlaying(true);
+}
+function setPlaying(p) { playing = p; $("#play").textContent = p ? "⏸ Pause" : "▶ Play"; }
+$("#play").onclick = () => { if (farm.finished) start(seed); else setPlaying(!playing); };
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
+  speed = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b)); });
+$("#restart").onclick = () => start(1 + Math.floor(Math.random() * 999));
+$("#spin").onclick = () => { spin = !spin; controls.autoRotate = spin; $("#spin").classList.toggle("on", spin); };
+
+start(7);
+for (const st of farm.stations) buildPlot(st);
+
+// ---------------------------------------------------------------- per-frame update
+const clock = new THREE.Clock();
+let hudTimer = 0;
+const v = new THREE.Vector3();
+function pumpActive(f) {
+  const p = f.pumps[f.pumps.length - 1];
+  return p && farm.ts >= p.issued_at && farm.ts < p.issued_at + p.minutes * 60;
+}
+function frame() {
+  const dt = Math.min(0.1, clock.getDelta());
+  if (playing && !farm.finished) {
+    carry += dt * speed * 3600;
+    while (carry >= KSFarm.STEP_S && farm.tick()) carry -= KSFarm.STEP_S;
+  } else if (farm.finished && playing) setPlaying(false);
+  const ts = farm.ts + (playing ? carry : 0), h = KSFarm.simHour(ts), w = farm.weather.day(KSFarm.simDay(farm.ts));
+
+  // sun, sky, light
+  const elev = Math.sin(Math.PI * (h - 6) / 12), az = Math.PI * (h - 6) / 12;
+  sun.position.set(-Math.cos(az) * 120, Math.max(elev, -0.2) * 110 + 4, -40);
+  sunDisc.position.copy(sun.position).normalize().multiplyScalar(330); sunDisc.visible = elev > -0.05;
+  const day = THREE.MathUtils.clamp(elev * 2.2 + 0.25, 0, 1), dusk = THREE.MathUtils.clamp(1 - Math.abs(elev) * 4, 0, 1) * (elev > -0.3 ? 1 : 0);
+  const raining = w.rain_mm > 0 && h >= 14.5 && h < 16.5, overcast = w.rain_mm > 0 && h >= 12 && h < 18 ? 0.45 : 0;
+  sun.intensity = 2.6 * day * (1 - overcast); hemi.intensity = 0.15 + 0.75 * day;
+  skyU.top.value.setRGB(0.04 + 0.27 * day, 0.07 + 0.49 * day, 0.15 + 0.69 * day).lerp(new THREE.Color(0x6d7480), overcast);
+  skyU.bottom.value.setRGB(0.08 + 0.78 * day + 0.5 * dusk, 0.1 + 0.82 * day + 0.2 * dusk, 0.18 + 0.79 * day).lerp(new THREE.Color(0x9aa3ad), overcast);
+  scene.fog.color.copy(skyU.bottom.value); stars.material.opacity = THREE.MathUtils.clamp(-elev * 3, 0, 0.9);
+  rain.material.opacity = raining ? 0.75 : Math.max(0, rain.material.opacity - dt);
+  if (rain.material.opacity > 0) {
+    for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3 + 1] -= dt * 38; if (rainPos[i * 3 + 1] < 0) rainPos[i * 3 + 1] += 50; }
+    rainGeo.attributes.position.needsUpdate = true;
+  }
+
+  // plots
+  for (const p of Object.values(plots)) {
+    const f = farm.fields[p.st.station_id], frac = f.avail / f.taw, dep = 1 - frac, rawFrac = f.raw / f.taw;
+    p.soilMat.color.copy(DRY).lerp(WET, THREE.MathUtils.clamp(frac, 0, 1));
+    const health = THREE.MathUtils.clamp(1 - Math.max(0, dep - rawFrac) / (0.85 - rawFrac + 1e-6), 0, 1);
+    const wilt = THREE.MathUtils.clamp((dep - rawFrac) * 3, 0, 1) * (h > 11 && h < 17 ? 1 : 0.5);
+    updatePlants(p, health, wilt);
+    const pumping = pumpActive(f);
+    p.pumpLampMat.emissiveIntensity = pumping ? 2 + Math.sin(performance.now() / 120) : 0;
+    const wantWater = pumping && p.st.irrigation_method === "furrow" ? 0.55 : Math.max(0, p.waterMat.opacity - dt * 0.4);
+    p.waterMat.opacity += (wantWater - p.waterMat.opacity) * Math.min(1, dt * 3);
+    p.pumping = pumping;
+    // upload → LED blink + data packet
+    if (f.totals.uploads > p.lastUploads) {
+      if (f.totals.uploads - p.lastUploads < 40) sendPacket(p.stationWorld, f.lastUpload && f.lastUpload.sent > 1 ? 0xffd166 : 0x7cf0a8);
+      p.lastUploads = f.totals.uploads; p.ledUntil = performance.now() + 250;
+    }
+    if (f.online === false) { p.ledMat.color.set(0xef4444); p.ledMat.emissive.set(0xef4444); p.ledMat.emissiveIntensity = (performance.now() % 1000) < 500 ? 2 : 0.2; }
+    else { p.ledMat.color.set(0x22c55e); p.ledMat.emissive.set(0x22c55e); p.ledMat.emissiveIntensity = performance.now() < p.ledUntil ? 3 : 0.15; }
+  }
+
+  // sprinkler / drip spray particles
+  for (let i = 0; i < SPRAY_N; i++) {
+    let o = sprayOwner[i];
+    if (o && sprayPos[i * 3 + 1] < 0.6) { o = sprayOwner[i] = null; sprayPos[i * 3 + 1] = -100; }
+    if (!o) {
+      const active = Object.values(plots).filter(p => p.pumping && p.st.irrigation_method !== "furrow");
+      if (active.length && Math.random() < 0.5) {
+        const p = active[i % active.length]; sprayOwner[i] = p;
+        if (p.st.irrigation_method === "sprinkler") {
+          const hd = p.heads[i % p.heads.length], a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 3;
+          sprayPos.set([hd.x, hd.y, hd.z], i * 3); sprayVel.set([Math.cos(a) * s, 3 + Math.random() * 2, Math.sin(a) * s], i * 3);
+        } else {
+          const pl = p.plants[(i * 7) % p.plants.length];
+          sprayPos.set([p.cx + pl.x, 0.75, p.cz + pl.z], i * 3); sprayVel.set([0, -0.4, 0], i * 3);
+        }
+      }
+      continue;
+    }
+    sprayVel[i * 3 + 1] -= 9.8 * dt;
+    for (let k = 0; k < 3; k++) sprayPos[i * 3 + k] += sprayVel[i * 3 + k] * dt;
+  }
+  sprayGeo.attributes.position.needsUpdate = true;
+
+  // data packets
+  for (let i = packets.length - 1; i >= 0; i--) {
+    const pk = packets[i]; pk.t += dt * 1.1;
+    if (pk.t >= 1) { scene.remove(pk.m); pk.m.material.dispose(); packets.splice(i, 1); continue; }
+    pk.m.position.copy(pk.curve.getPoint(pk.t));
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  // labels follow the stations
+  for (const p of Object.values(plots)) {
+    v.copy(p.stationWorld); v.y += 1.6; v.project(camera);
+    const vis = v.z < 1;
+    p.label.style.display = vis ? "block" : "none";
+    if (vis) { p.label.style.left = ((v.x + 1) / 2 * innerWidth) + "px"; p.label.style.top = ((1 - v.y) / 2 * innerHeight) + "px"; }
+  }
+
+  hudTimer -= dt;
+  if (hudTimer <= 0) { hudTimer = 0.3; hud(w, raining); }
+  requestAnimationFrame(frame);
+}
+
+function hud(w, raining) {
+  $("#clock").textContent = fmtTime(farm.ts);
+  $("#day").textContent = `day ${Math.min(KSFarm.simDay(farm.ts) + 1, SEASON_DAYS)} of ${SEASON_DAYS}` + (farm.finished ? " · season complete" : "");
+  $("#weather").textContent = `${raining ? "🌧️ Raining" : w.rain_mm > 0 ? "☁️ Rain due this afternoon" : "☀️ Dry day"} · ${w.t_min.toFixed(0)}–${w.t_max.toFixed(0)} °C · `
+    + `forecast said ${w.forecast_rain_mm.toFixed(0)} mm at ${Math.round(w.forecast_prob_pct)}%`;
+  for (const p of Object.values(plots)) {
+    const adv = farm.api(`/api/v1/advice?station_id=${p.st.station_id}`), f = farm.fields[p.st.station_id];
+    const [lab, col] = STATUS[adv.status] || [adv.status, "#52514e"], water = adv.available_water_pct;
+    p.label.innerHTML = `<b>${esc(p.st.name.split(" (")[0])}</b> · ${esc(p.st.irrigation_method)}${p.st.auto_pump ? " · auto pump" : ""}<br>
+      <span class="st" style="color:${col}">${lab}</span>${p.pumping ? " · 💧 pump running" : ""}${f.online === false ? ` · 📵 offline (${f.buffer.length} saved)` : ""}
+      <div class="bar"><i style="width:${Math.min(100, water || 0)}%"></i></div>soil water ${water ?? "–"}% · refill at ${Math.round(100 * (1 - KSFarm.CROPS[p.st.crop][4]))}%`;
+  }
+  const msgs = farm.alerts.filter(a => a.recipient === "SIMULATED-or").slice(0, 3);
+  $("#msgs").innerHTML = msgs.length ? msgs.map(a => `<div class="wa">${esc(a.text)}<div class="t">${fmtTime(a.sent_at)}</div></div>`).join("")
+    : `<div class="wa">No alerts yet</div>`;
+}
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+frame();
+</script>
+<script>
+  // if the 3D library cannot load (offline / blocked CDN), say so instead of a blank screen
+  setTimeout(() => { const l = document.getElementById("loading"); if (l) l.innerHTML =
+    "The 3D view needs an internet connection to load its graphics library (three.js).<br>" +
+    '<a style="color:#9cc8ff" href="./">Open the live dashboard instead</a>'; }, 8000);
+</script>
+</body>
+</html>

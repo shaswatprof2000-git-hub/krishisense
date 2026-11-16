@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "KrishiSense: build Wokwi firmware",
+      "type": "shell",
+      "command": "pio run -e wokwi",
+      "options": { "cwd": "${workspaceFolder}/firmware" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "KrishiSense: server for Wokwi (dashboard on :8080)",
+      "type": "shell",
+      "command": "python3 -m krishisense --config stations.wokwi.json --db wokwi.db serve",
+      "options": { "cwd": "${workspaceFolder}/server" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "KrishiSense: software simulation (3 virtual farms)",
+      "type": "shell",
+      "command": "python3 -m krishisense sim --days 14 --speed 3600",
+      "options": { "cwd": "${workspaceFolder}/server" },
+      "problemMatcher": []
+    },
+    {
+      "label": "KrishiSense: run tests",
+      "type": "shell",
+      "command": "pytest -q",
+      "options": { "cwd": "${workspaceFolder}/server" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

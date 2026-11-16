@@ -13,10 +13,24 @@
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 #include <ArduinoJson.h>
+#ifdef USE_DHT22
+#include <DHT.h>  // the Wokwi simulator has no BME280 part, so the virtual board uses a DHT22
+#endif
 #include <time.h>
 #include "esp_sleep.h"
 
+#ifdef KS_WOKWI
+#include "config.wokwi.h"  // virtual board in Wokwi (see wokwi.toml / diagram.json)
+#else
 #include "config.h"
+#endif
+
+#ifndef SLEEP_SECONDS
+#define SLEEP_SECONDS (SLEEP_MINUTES * 60UL)
+#endif
+#ifndef PUMP_SECONDS_PER_MINUTE
+#define PUMP_SECONDS_PER_MINUTE 60UL  // the simulator can speed pump runs up
+#endif
 
 #define FW_VERSION "0.1.0"
 #define BUFFER_SIZE 96            // 96 x 15 min = 24 h of offline storage
@@ -39,6 +53,9 @@ RTC_DATA_ATTR uint32_t seqCounter = 0;
 RTC_DATA_ATTR uint32_t failedUploads = 0;
 
 Adafruit_BME280 bme;
+#ifdef USE_DHT22
+DHT dht(PIN_DHT, DHT22);
+#endif
 
 static uint16_t readAdcAveraged(int pin, int samples = 16) {
   uint32_t sum = 0;
@@ -67,6 +84,13 @@ static Reading takeReading() {
   r.soilTop = readAdcAveraged(PIN_SOIL_TOP);
   r.soilDeep = readAdcAveraged(PIN_SOIL_DEEP);
 
+#ifdef USE_DHT22
+  dht.begin();
+  delay(100);
+  r.airTempC = dht.readTemperature();
+  r.humidity = dht.readHumidity();
+  r.pressureHpa = NAN;
+#else
   if (bme.begin(0x76, &Wire) || bme.begin(0x77, &Wire)) {
     bme.setSampling(Adafruit_BME280::MODE_FORCED, Adafruit_BME280::SAMPLING_X1,
                     Adafruit_BME280::SAMPLING_X1, Adafruit_BME280::SAMPLING_X1,
@@ -79,6 +103,7 @@ static Reading takeReading() {
     r.airTempC = r.humidity = r.pressureHpa = NAN;
     Serial.println("BME280 not found");
   }
+#endif
   digitalWrite(PIN_SENSOR_POWER, LOW);
 
   r.batteryV = readBatteryVolts();
@@ -98,7 +123,11 @@ static void pushToBuffer(const Reading& r) {
 
 static bool connectWifi() {
   WiFi.mode(WIFI_STA);
+#ifdef WIFI_CHANNEL
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD, WIFI_CHANNEL);  // a fixed channel connects faster
+#else
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+#endif
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_TIMEOUT_MS) delay(250);
   if (WiFi.status() != WL_CONNECTED) return false;
@@ -126,7 +155,7 @@ static int uploadBuffer() {
     o["seq"] = r.seq;
     // Readings taken before the first time sync get a timestamp estimated from their age.
     uint32_t ts = r.ts;
-    if (ts == 0 && now > VALID_EPOCH) ts = now - (bufCount - 1 - i) * SLEEP_MINUTES * 60UL;
+    if (ts == 0 && now > VALID_EPOCH) ts = now - (bufCount - 1 - i) * SLEEP_SECONDS;
     o["ts"] = ts;
     JsonArray soil = o["soil_raw"].to<JsonArray>();
     soil.add(r.soilTop);
@@ -168,7 +197,7 @@ static void runPump(int minutes) {
   WiFi.disconnect(true);  // save power while waiting
   WiFi.mode(WIFI_OFF);
   pumpWrite(true);
-  delay((uint32_t)minutes * 60UL * 1000UL);
+  delay((uint32_t)minutes * PUMP_SECONDS_PER_MINUTE * 1000UL);
   pumpWrite(false);
   Serial.println("Pump OFF");
 #else
@@ -209,7 +238,7 @@ void setup() {
 
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
-  esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_MINUTES * 60ULL * 1000000ULL);
+  esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_SECONDS * 1000000ULL);
   esp_deep_sleep_start();
 }
 

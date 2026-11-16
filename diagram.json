@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "author": "Shaswat Mohanty",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-slide-potentiometer",
+      "id": "soilTop",
+      "top": -150,
+      "left": -240,
+      "rotate": 0,
+      "attrs": {
+        "travelLength": "30"
+      }
+    },
+    {
+      "type": "wokwi-slide-potentiometer",
+      "id": "soilDeep",
+      "top": -60,
+      "left": -240,
+      "rotate": 0,
+      "attrs": {
+        "travelLength": "30"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "battery",
+      "top": 60,
+      "left": -210,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -140,
+      "left": 160,
+      "attrs": {
+        "temperature": "31",
+        "humidity": "62"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledSensor",
+      "top": 120,
+      "left": 190,
+      "attrs": {
+        "color": "green",
+        "label": "sensor power"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 170,
+      "left": 150,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 220,
+      "left": 160,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledPump",
+      "top": 200,
+      "left": 340,
+      "attrs": {
+        "color": "blue",
+        "label": "pump"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 260,
+      "left": 330,
+      "rotate": 90,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "soilTop:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "soilTop:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "soilTop:SIG",
+      "esp:34",
+      "green",
+      []
+    ],
+    [
+      "soilDeep:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "soilDeep:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "soilDeep:SIG",
+      "esp:35",
+      "green",
+      []
+    ],
+    [
+      "battery:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "battery:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "battery:SIG",
+      "esp:33",
+      "orange",
+      []
+    ],
+    [
+      "dht:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "dht:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "dht:SDA",
+      "esp:27",
+      "purple",
+      []
+    ],
+    [
+      "esp:25",
+      "r1:1",
+      "green",
+      []
+    ],
+    [
+      "r1:2",
+      "ledSensor:A",
+      "green",
+      []
+    ],
+    [
+      "ledSensor:C",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "relay:VCC",
+      "esp:5V",
+      "red",
+      []
+    ],
+    [
+      "relay:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "relay:IN",
+      "esp:26",
+      "blue",
+      []
+    ],
+    [
+      "relay:COM",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "relay:NO",
+      "r2:1",
+      "blue",
+      []
+    ],
+    [
+      "r2:2",
+      "ledPump:A",
+      "blue",
+      []
+    ],
+    [
+      "ledPump:C",
+      "esp:GND.2",
+      "black",
+      []
+    ]
+  ],
+  "dependencies": {}
+}

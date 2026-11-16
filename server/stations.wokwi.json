@@ -1,0 +1,42 @@
+{
+  "stations": [
+    {
+      "station_id": "wokwi-01",
+      "name": "Wokwi virtual station",
+      "device_key": "wokwi-demo-key",
+      "lat": 20.39,
+      "lon": 85.86,
+      "crop": "tomato",
+      "stage": "mid",
+      "soil": "loam",
+      "area_m2": 1000,
+      "pump_lpm": 300,
+      "irrigation_method": "furrow",
+      "probes": [
+        {
+          "raw_dry": 3000,
+          "raw_field_capacity": 1300
+        },
+        {
+          "raw_dry": 3000,
+          "raw_field_capacity": 1300
+        }
+      ],
+      "contacts": [
+        {
+          "name": "Farmer (Odia)",
+          "whatsapp": "SIMULATED-or",
+          "language": "or"
+        },
+        {
+          "name": "Supervisor (English)",
+          "whatsapp": "SIMULATED-en",
+          "language": "en"
+        }
+      ],
+      "auto_pump": true,
+      "max_pump_minutes": 60,
+      "stale_after_hours": 3
+    }
+  ]
+}

@@ -5,6 +5,7 @@
 **A solar soil and weather station that tells farmers when to irrigate, and for how long, on WhatsApp in Odia, Hindi or English.**
 
 ▶ **[Open the live farm simulation](https://shaswatprof2000-git-hub.github.io/krishisense/)**: three virtual sensor stations, the irrigation advisor and WhatsApp alerts running in your browser. No install.
+· **[3D farm](https://shaswatprof2000-git-hub.github.io/krishisense/farm3d.html)**: the same farms in 3D, with day and night, rain, pumps and sensor data flying to the gateway.
 · **[Season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html)**: KrishiSense advice vs a fixed watering schedule.
 
 Farmers usually irrigate by habit or by looking at the soil surface. That often means too much water, too
@@ -60,7 +61,7 @@ Build and test in three stages, so nothing is bought until the software is prove
 | Stage | What runs | Command / tool |
 |---|---|---|
 | **1. Software simulation** | Virtual field stations + the real server + live dashboard | `python -m krishisense sim` |
-| **2. Virtual hardware** | The ESP32 firmware on a simulated board (Wokwi in VS Code) | roadmap |
+| **2. Virtual hardware** | The real ESP32 firmware on a simulated board, talking to the real server | Wokwi in VS Code, see below |
 | **3. Real hardware** | Solar ESP32 station in the field | see [`hardware/`](hardware/README.md) |
 
 ```bash
@@ -90,6 +91,35 @@ JavaScript, so anyone can open the link and watch a season play out. The
 [season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html) (`docs/season.html`) is a
 simplified model that compares a KrishiSense farmer with a fixed watering schedule; its KrishiSense farmer
 waters on the day the advice says so. Results from all the simulators are illustrative, not field results.
+
+## Virtual hardware: the real firmware on a simulated ESP32 (Wokwi)
+
+[Wokwi](https://wokwi.com) simulates the ESP32 inside VS Code. The board in [`diagram.json`](diagram.json) is wired
+like the field station:
+
+| Real station | Virtual board | Pin |
+|---|---|---|
+| Soil probe 15 cm / 30 cm | two slide potentiometers (slide up = drier) | GPIO34 / GPIO35 |
+| BME280 temperature + humidity | DHT22 (Wokwi has no BME280 part) | GPIO27 |
+| Battery divider | rotary potentiometer | GPIO33 |
+| Sensor power switch | green LED | GPIO25 |
+| Pump relay + contactor | relay module + blue "pump" LED | GPIO26 |
+
+The `wokwi` build ([`firmware/include/config.wokwi.h`](firmware/include/config.wokwi.h)) joins Wokwi's virtual Wi-Fi,
+takes a reading every 15 seconds instead of 15 minutes, and uploads to the KrishiSense server on your own computer
+(`host.wokwi.internal:8080`) through the gateway built into Wokwi for VS Code. Pump control is switched on in the
+simulator, and each pump minute lasts one second.
+
+1. Open the repo in VS Code and install the recommended extensions it offers: Wokwi Simulator, PlatformIO, Python.
+2. Get a Wokwi licence: F1 → **Wokwi: Request a new License** (free for open-source projects).
+3. Build: **Terminal → Run Task → KrishiSense: build Wokwi firmware** (or `cd firmware && pio run -e wokwi`).
+4. Start the server: **Run Task → KrishiSense: server for Wokwi** (or
+   `cd server && python -m krishisense --config stations.wokwi.json --db wokwi.db serve`).
+5. Open `diagram.json`, then F1 → **Wokwi: Start Simulator**. Keep the simulator tab visible.
+6. Open http://localhost:8080. Slide the soil probes up to dry the soil and watch the advice change, the
+   WhatsApp messages appear in the feed, and the relay switch the pump LED on.
+
+The same firmware, unchanged except for its config file, runs on the real board.
 
 ## Run it for real
 
@@ -150,7 +180,8 @@ The server uses only the Python standard library plus `requests`, so it runs on 
 
 - [ ] Field-test calibration and the advisor near Phulnakhara through one season. Compare water used vs. farmer's usual practice.
 - [x] Software simulation: virtual stations, simulation mode, live dashboard, browser simulator
-- [ ] Wokwi virtual ESP32 in VS Code, talking to the local server
+- [x] Wokwi virtual ESP32 in VS Code, talking to the local server
+- [x] 3D farm view in the browser
 - [ ] Phase 2: pump relay + contactor, NPK sensor over RS485, LoRa for fields with no signal
 - [ ] Paddy mode: alternate wetting and drying (AWD) using a water-level sensor in a field tube
 - [ ] Voice messages in Odia for farmers who prefer audio

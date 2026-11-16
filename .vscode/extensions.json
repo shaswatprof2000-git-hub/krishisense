@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "wokwi.wokwi-vscode",
+    "platformio.platformio-ide",
+    "ms-python.python",
+    "github.vscode-github-actions"
+  ]
+}
