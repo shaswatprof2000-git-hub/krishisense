@@ -1,6 +1,7 @@
 """Tests for the software simulation: simulated weather, virtual stations, sim-mode server, dashboard."""
 import threading
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 import requests
@@ -92,4 +93,34 @@ def test_sim_server_endpoints_and_dashboard(tmp_path):
         assert page.status_code == 200 and "KrishiSense" in page.text and "/api/v1/stations" in page.text
         assert requests.get(base + "/status").status_code == 200
     finally:
+        httpd.shutdown()
+
+
+def test_dashboard_reads_are_safe_while_stations_upload(tmp_path):
+    """The dashboard polls from several threads while stations POST readings; the shared
+    SQLite connection must never hand a reader a half-used cursor (500s / dropped requests)."""
+    svc, sc, stations = make_service(tmp_path)
+    httpd = serve(svc, "127.0.0.1", 0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    uploader = threading.Thread(target=run, args=(demo_fields(sc, stations), HttpTransport(base)),
+                                kwargs={"days": 3}, daemon=True)
+    paths = ["/api/v1/stations", "/api/v1/history?station_id=sim-tomato", "/api/v1/alerts"]
+
+    def get(i):
+        try:
+            return requests.get(base + paths[i % len(paths)], timeout=10).status_code
+        except requests.RequestException as e:   # a crashed handler drops the connection
+            return type(e).__name__
+
+    try:
+        uploader.start()
+        while svc.store.latest_ts() is None:      # wait for the first upload
+            pass
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            results = list(pool.map(get, range(50)))
+        assert uploader.is_alive(), "uploads finished before the reads; test did not overlap"
+        assert results == [200] * 50, Counter(results)
+    finally:
+        uploader.join(timeout=60)
         httpd.shutdown()

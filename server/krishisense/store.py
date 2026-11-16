@@ -32,7 +32,9 @@ class Store:
     def __init__(self, path: str = "krishisense.db"):
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
-        self.lock = threading.Lock()
+        # One connection is shared by the HTTP server's threads, so every read and write
+        # holds this lock. Re-entrant, so a locked method may call another one.
+        self.lock = threading.RLock()
         with self.lock:
             self.conn.executescript(SCHEMA)
 
@@ -48,19 +50,23 @@ class Store:
             return cur.rowcount == 1
 
     def latest_reading(self, station_id: str) -> Reading | None:
-        row = self.conn.execute(
-            "SELECT * FROM readings WHERE station_id=? ORDER BY ts DESC LIMIT 1", (station_id,)).fetchone()
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT * FROM readings WHERE station_id=? ORDER BY ts DESC LIMIT 1", (station_id,)).fetchone()
         return None if row is None else _to_reading(row)
 
     def readings(self, station_id: str, limit: int = 200) -> list[dict]:
-        rows = self.conn.execute(
-            "SELECT * FROM readings WHERE station_id=? ORDER BY ts DESC LIMIT ?", (station_id, limit)).fetchall()
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT * FROM readings WHERE station_id=? ORDER BY ts DESC LIMIT ?",
+                (station_id, limit)).fetchall()
         return [{**dict(r), "soil_raw": json.loads(r["soil_raw"])} for r in rows]
 
     def temp_range(self, station_id: str, since_s: float) -> tuple[float, float] | None:
-        row = self.conn.execute(
-            "SELECT MIN(air_temp_c), MAX(air_temp_c) FROM readings WHERE station_id=? AND ts>=? "
-            "AND air_temp_c IS NOT NULL", (station_id, since_s)).fetchone()
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT MIN(air_temp_c), MAX(air_temp_c) FROM readings WHERE station_id=? AND ts>=? "
+                "AND air_temp_c IS NOT NULL", (station_id, since_s)).fetchone()
         return None if row[0] is None else (row[0], row[1])
 
     def save_advice(self, a: Advice, ts: float | None = None) -> None:
@@ -70,17 +76,21 @@ class Store:
             self.conn.commit()
 
     def latest_advice(self, station_id: str) -> dict | None:
-        row = self.conn.execute("SELECT payload FROM advice WHERE station_id=? ORDER BY created_at DESC LIMIT 1",
-                                (station_id,)).fetchone()
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT payload FROM advice WHERE station_id=? ORDER BY created_at DESC LIMIT 1",
+                (station_id,)).fetchone()
         return None if row is None else json.loads(row[0])
 
     def last_alert(self, station_id: str, status: str | None = None) -> sqlite3.Row | None:
-        if status is None:
-            return self.conn.execute("SELECT * FROM alerts WHERE station_id=? ORDER BY sent_at DESC LIMIT 1",
-                                     (station_id,)).fetchone()
-        return self.conn.execute(
-            "SELECT * FROM alerts WHERE station_id=? AND status=? ORDER BY sent_at DESC LIMIT 1",
-            (station_id, status)).fetchone()
+        with self.lock:
+            if status is None:
+                return self.conn.execute(
+                    "SELECT * FROM alerts WHERE station_id=? ORDER BY sent_at DESC LIMIT 1",
+                    (station_id,)).fetchone()
+            return self.conn.execute(
+                "SELECT * FROM alerts WHERE station_id=? AND status=? ORDER BY sent_at DESC LIMIT 1",
+                (station_id, status)).fetchone()
 
     def log_alert(self, station_id: str, status: str, recipient: str, text: str,
                   ts: float | None = None) -> None:
@@ -90,8 +100,9 @@ class Store:
             self.conn.commit()
 
     def last_pump_command(self, station_id: str) -> float | None:
-        row = self.conn.execute("SELECT MAX(issued_at) FROM pump_commands WHERE station_id=?",
-                                (station_id,)).fetchone()
+        with self.lock:
+            row = self.conn.execute("SELECT MAX(issued_at) FROM pump_commands WHERE station_id=?",
+                                    (station_id,)).fetchone()
         return row[0]
 
     def log_pump_command(self, station_id: str, minutes: int, ts: float | None = None) -> None:
@@ -103,8 +114,10 @@ class Store:
 
     # ---- queries for the dashboard ---------------------------------------------
     def history(self, station_id: str, since_ts: float) -> list[sqlite3.Row]:
-        return self.conn.execute(
-            "SELECT * FROM readings WHERE station_id=? AND ts>=? ORDER BY ts", (station_id, since_ts)).fetchall()
+        with self.lock:
+            return self.conn.execute(
+                "SELECT * FROM readings WHERE station_id=? AND ts>=? ORDER BY ts",
+                (station_id, since_ts)).fetchall()
 
     def alerts(self, station_id: str | None = None, limit: int = 50) -> list[dict]:
         q, args = "SELECT * FROM alerts", []
@@ -112,15 +125,20 @@ class Store:
             q += " WHERE station_id=?"
             args.append(station_id)
         q += " ORDER BY sent_at DESC LIMIT ?"
-        return [dict(r) for r in self.conn.execute(q, args + [limit]).fetchall()]
+        with self.lock:
+            rows = self.conn.execute(q, args + [limit]).fetchall()
+        return [dict(r) for r in rows]
 
     def pump_events(self, station_id: str, since_ts: float) -> list[dict]:
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM pump_commands WHERE station_id=? AND issued_at>=? ORDER BY issued_at",
-            (station_id, since_ts)).fetchall()]
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT * FROM pump_commands WHERE station_id=? AND issued_at>=? ORDER BY issued_at",
+                (station_id, since_ts)).fetchall()
+        return [dict(r) for r in rows]
 
     def latest_ts(self) -> float | None:
-        return self.conn.execute("SELECT MAX(ts) FROM readings").fetchone()[0]
+        with self.lock:
+            return self.conn.execute("SELECT MAX(ts) FROM readings").fetchone()[0]
 
 
 def _to_reading(row) -> Reading:
