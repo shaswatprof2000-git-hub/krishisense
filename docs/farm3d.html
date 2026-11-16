@@ -142,6 +142,11 @@
   .keys { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 16px; color: var(--mute); font-size: 13px; }
   kbd { background: var(--slate-3); border-radius: 5px; padding: 1px 6px; font: 12px var(--body); color: var(--paper); }
 
+  .embedded .top, .embedded .rail .foot { display: none; }
+  .embedded .app { grid-template-rows: minmax(0, 1fr) auto; }
+  .embedded .rail, .embedded .insp { grid-row: 1; }
+  .embedded .stream { grid-row: 2; }
+  .embedded #map { top: 10px; }
   @media (max-width: 1100px) { .app { grid-template-columns: 220px minmax(0, 1fr) 300px; } .facts { grid-template-columns: 1fr 1fr; } #map { left: 240px; right: 320px; } }
   @media (max-width: 820px) {
     body { overflow: auto; }
@@ -205,7 +210,7 @@
       <label class="toggle">Field labels <input type="checkbox" data-layer="labels" checked></label>
       <label class="toggle">Rain and clouds <input type="checkbox" data-layer="weather" checked></label>
     </div>
-    <div class="foot">Farms, weather and messages are simulated.<br><a href="./">Dashboard</a> · <a href="season.html">Season comparison</a> · <a href="https://github.com/shaswatprof2000-git-hub/krishisense">Code</a></div>
+    <div class="foot">Farms, weather and messages are simulated.<br><a href="./">All views</a> · <a href="live.html">Dashboard</a> · <a href="season.html">Season comparison</a> · <a href="https://github.com/shaswatprof2000-git-hub/krishisense">Code</a></div>
   </nav>
 
   <aside class="insp panel" id="insp" aria-label="Selected field"></aside>
@@ -245,59 +250,30 @@ const WORD = { OK: "Soil OK", IRRIGATE_SOON: "Water tomorrow", IRRIGATE_NOW: "Wa
 const SHORT = { "sim-tomato": "Tomato", "sim-groundnut": "Groundnut", "sim-chilli": "Chilli" };
 const MODE = { "sim-tomato": "The farmer follows the WhatsApp advice", "sim-groundnut": "The pump is switched automatically", "sim-chilli": "The network drops on day 5" };
 
+// One shared Season: the hub's when embedded (all views stay in step), otherwise this page's own.
+const HUB = (() => { try { return window.parent !== window && window.parent.KSHub ? window.parent.KSHub : null; } catch (e) { return null; } })();
+const S = HUB ? HUB.season : new KSFarm.Season({ seed: 7, days: SEASON, warmupHours: 30, speed: 4 });
+if (HUB) document.documentElement.classList.add("embedded");
 const T = window.Twin = {
-  farm: null, seed: 7, speed: 4, playing: true, selected: "sim-tomato", lang: "or", mode: "3d", has3d: false,
+  lang: "or", mode: "3d", has3d: false, listeners: {},
   layers: { heat: false, flow: true, labels: true, weather: true },
-  events: [], listeners: {}, carry: 0,
+  get farm() { return S.farm; }, get playing() { return S.playing; }, get carry() { return S.carry; },
+  get selected() { return S.selected; }, get events() { return S.events; }, get seed() { return S.seed; },
   on(ev, fn) { (this.listeners[ev] ||= []).push(fn); },
   emit(ev, ...a) { (this.listeners[ev] || []).forEach(fn => fn(...a)); },
-  ids() { return this.farm.stations.map(s => s.station_id); },
-  pumpActive(id) { const f = this.farm.fields[id], p = f.pumps[f.pumps.length - 1];
-    return !!p && this.farm.ts >= p.issued_at && this.farm.ts < p.issued_at + p.minutes * 60; },
+  ids() { return S.ids(); },
+  pumpActive(id) { return S.pumpActive(id); },
 };
-
-// ---------- simulation with event detection ----------
-let prev = {};
-function snapshot() {
-  const s = {};
-  for (const id of T.ids()) { const f = T.farm.fields[id]; s[id] = { pumps: f.pumps.length, online: f.online !== false }; }
-  s.alert = T.farm.alerts[0]; return s;
-}
-function pushEvent(e) { T.events.unshift(e); if (T.events.length > 80) T.events.pop(); T.newEvents = true; }
-function step() {
-  if (!T.farm.tick()) return false;
-  const now = T.farm.ts, h = KSFarm.simHour(now), w = T.farm.weather.day(KSFarm.simDay(now));
-  for (const id of T.ids()) {
-    const f = T.farm.fields[id], p = prev[id];
-    if (f.pumps.length > p.pumps) { const pu = f.pumps[f.pumps.length - 1];
-      pushEvent({ ts: now, id, kind: "pump", text: `${SHORT[id]}: pump on for ${pu.minutes} min (${pu.source === "farmer" ? "farmer" : "automatic"})` }); }
-    const online = f.online !== false;
-    if (!online && p.online) pushEvent({ ts: now, id, kind: "net", text: `${SHORT[id]}: network lost, saving readings` });
-    if (online && !p.online) pushEvent({ ts: now, id, kind: "net", text: `${SHORT[id]}: back online, ${f.lastUpload ? f.lastUpload.sent : "?"} readings sent at once` });
-  }
-  const fresh = [];
-  for (const a of T.farm.alerts) { if (a === prev.alert) break; if (a.recipient === "SIMULATED-en") fresh.push(a); }
-  fresh.reverse().forEach(a => pushEvent({ ts: a.sent_at, id: a.station_id, kind: "alert", status: a.status, text: `${SHORT[a.station_id]}: WhatsApp sent, ${WORD[a.status].toLowerCase()}` }));
-  if (Math.abs(h - 15) < 1e-6 && w.rain_mm > 0) pushEvent({ ts: now, id: null, kind: "rain", text: `Rain shower, ${w.rain_mm.toFixed(0)} mm` });
-  prev = snapshot();
-  return true;
-}
-function restart(seed) {
-  T.seed = seed; T.farm = new KSFarm.Farm({ seed, days: SEASON }); T.events = []; T.carry = 0;
-  prev = snapshot(); for (let i = 0; i < 4 * 30; i++) step();      // start on day 2, 06:00 with some history
-  drawTicks(); T.emit("restart"); render(true);
-}
-function seek(ts) {                                               // time travel: replay the season to any moment
-  ts = Math.max(EPOCH + STEP, Math.min(EPOCH + SEASON * DAY, ts));
-  if (ts < T.farm.ts) { T.farm = new KSFarm.Farm({ seed: T.seed, days: SEASON }); T.events = []; prev = snapshot(); T.emit("restart"); }
-  while (T.farm.ts + STEP <= ts && step());
-  T.carry = 0; render(true);
-}
+S.on("restart", () => { T.emit("restart"); drawTicks(); render(true); });
+S.on("select", id => { T.emit("select", id); render(true); });
+S.on("seek", () => render(true));
+S.on("state", () => renderTop());
+function restart(seed) { S.restart(seed); }
+function seek(ts) { S.seek(ts); }
 T.seek = seek;
 
 // ---------- formatting helpers ----------
-const fmt = ts => { const d = KSFarm.simDay(ts) + 1, h = KSFarm.simHour(ts), mm = Math.round((h % 1) * 60) % 60;
-  return `Day ${d}, ${String(Math.floor(h)).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; };
+const fmt = KSFarm.fmtSim;
 const ringSvg = (pct, refill, color, size = 46) => {
   const r = size / 2 - 5, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0)) / 100;
   const rx = size / 2 + r * Math.sin((refill / 100) * 2 * Math.PI), ry = size / 2 - r * Math.cos((refill / 100) * 2 * Math.PI);
@@ -437,11 +413,13 @@ function renderTop() {
   $("#done").style.width = p + "%"; $("#knob").style.left = p + "%";
   $("#scrub").setAttribute("aria-valuenow", KSFarm.simDay(ts) + 1);
   $("#play").textContent = T.playing ? "Pause" : T.farm.finished ? "Replay" : "Play";
+  document.querySelectorAll("[data-speed]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.speed === S.speed));
 }
 const ICON = { pump: ["#e8b931", "P"], net: ["#c084fc", "!"], alert: ["#8ccb6a", "W"], rain: ["#5ab0e6", "R"] };
+let shownVersion = -1;
 function renderStream() {
-  if (!T.newEvents && $("#events").children.length) return;
-  T.newEvents = false;
+  if (S.version === shownVersion && $("#events").children.length) return;
+  shownVersion = S.version;
   $("#events").innerHTML = T.events.length ? T.events.slice(0, 40).map((e, i) => { const [c, l] = ICON[e.kind];
     return `<button class="ev${i < 1 ? " fresh" : ""}" data-id="${e.id || ""}"><span class="ic" style="background:${e.kind === "alert" ? COLOR[e.status] : c}">${l}</span>${esc(e.text)}<time>${fmt(e.ts)}</time></button>`; }).join("")
     : `<span style="color:var(--faint)">Pump runs, WhatsApp alerts, rain and network drops appear here as the season runs.</span>`;
@@ -478,9 +456,9 @@ function render(force) {
 }
 
 // ---------- interaction ----------
-function select(id) { if (!id || !T.farm.fields[id]) return; T.selected = id; T.emit("select", id); render(true); }
+function select(id) { if (id) S.select(id); }
 T.select = select;
-function setPlaying(p) { T.playing = p; renderTop(); }
+function setPlaying(p) { S.setPlaying(p); }
 function setMode(m) {
   T.mode = m; document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m));
   $("#map").style.display = m === "map" ? "block" : "none"; $("#stage").classList.toggle("map-bg", m === "map");
@@ -493,8 +471,7 @@ $("#map").addEventListener("click", e => { const p = e.target.closest(".plot"); 
 $("#events").addEventListener("click", e => { const b = e.target.closest(".ev"); if (b && b.dataset.id) select(b.dataset.id); });
 $("#insp").addEventListener("click", e => { const b = e.target.closest("[data-lang]"); if (b) { T.lang = b.dataset.lang; renderInspector(); } });
 $("#play").onclick = () => { if (T.farm.finished) { restart(T.seed); setPlaying(true); } else setPlaying(!T.playing); };
-document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => { T.speed = +b.dataset.speed;
-  document.querySelectorAll("[data-speed]").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => S.setSpeed(+b.dataset.speed));
 document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
 document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => T.emit("preset", b.dataset.preset));
 document.querySelectorAll("[data-layer]").forEach(i => i.onchange = () => { T.layers[i.dataset.layer] = i.checked; T.emit("layer", i.dataset.layer, i.checked); render(true); });
@@ -507,7 +484,7 @@ help.onclick = e => { if (e.target === help) $("#helpClose").click(); };
 const scrub = $("#scrub");
 const scrubTo = ev => { const r = scrub.getBoundingClientRect(), p = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); seek(EPOCH + p * SEASON * DAY); };
 let dragging = false, wasPlaying = true;
-scrub.addEventListener("pointerdown", e => { dragging = true; wasPlaying = T.playing; T.playing = false; scrub.setPointerCapture(e.pointerId); scrubTo(e); });
+scrub.addEventListener("pointerdown", e => { dragging = true; wasPlaying = S.playing; S.playing = false; scrub.setPointerCapture(e.pointerId); scrubTo(e); });
 scrub.addEventListener("pointermove", e => { if (dragging) scrubTo(e); });
 scrub.addEventListener("pointerup", () => { dragging = false; setPlaying(wasPlaying && !T.farm.finished); });
 scrub.addEventListener("keydown", e => { if (e.key === "ArrowRight") { seek(T.farm.ts + DAY); e.preventDefault(); } if (e.key === "ArrowLeft") { seek(T.farm.ts - DAY); e.preventDefault(); } });
@@ -526,12 +503,11 @@ addEventListener("keydown", e => {
 let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.2, (now - last) / 1000); last = now;
-  if (T.playing && !T.farm.finished) { T.carry += dt * T.speed * 3600; while (T.carry >= STEP && step()) T.carry -= STEP; }
-  if (T.farm.finished && T.playing) setPlaying(false);
+  if (!HUB) S.advance(dt);            // inside the hub, the hub drives the shared clock
   render(false);
   requestAnimationFrame(loop);
 }
-restart(7);
+drawTicks(); render(true);
 requestAnimationFrame(loop);
 // if the 3D library has not arrived, switch to the map view and say why
 setTimeout(() => { if (!T.has3d) { $("#note3d").innerHTML = "The 3D view needs an internet connection to load its graphics library. The map view shows the same farms."; if (T.mode === "3d") setMode("map"); } }, 6000);

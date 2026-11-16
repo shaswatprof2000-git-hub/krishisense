@@ -3,260 +3,474 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KrishiSense · Live farm simulation</title>
-<meta name="description" content="KrishiSense running in your browser: three virtual solar soil stations, an FAO-56 irrigation advisor and WhatsApp alerts in Odia and English.">
+<title>KrishiSense</title>
+<meta name="description" content="KrishiSense: a solar soil sensor and irrigation advisor for smallholder farms in Odisha. Live dashboard, 3D digital twin, season comparison and hardware lab, all in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Noto+Sans+Oriya:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --surface: #fcfcfb; --card: #ffffff; --ink: #0b0b0b; --ink2: #52514e; --muted: #8a8984;
-    --grid: #e6e5e0; --blue: #2a78d6; --orange: #eb6834;
-    --good: #1a8a5c; --warn: #b47c00; --serious: #c4471f; --critical: #a3122b; --info: #2a78d6;
+    --slate: #1f2b36; --slate-2: #2a3946; --slate-3: #364857; --deep: #16212b;
+    --line: rgba(238, 241, 234, .12); --paper: #eef1ea; --mute: #a9b4ae; --faint: #77847e;
+    --canal: #5ab0e6; --paddy: #8ccb6a; --turmeric: #e8b931; --chilli: #e0533d; --laterite: #a4502f; --violet: #c084fc;
+    --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --odia: "Noto Sans Oriya", "Atkinson Hyperlegible", sans-serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--surface); color: var(--ink); }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; padding: 20px 28px 8px; }
-  h1 { font-size: 22px; margin: 0; }
-  .sub { color: var(--ink2); }
-  .clock { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink2); }
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
-           background: #eef3fb; color: var(--blue); }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; padding: 12px 28px 28px; }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
-  .cards { display: grid; gap: 16px; align-content: start; }
-  .card { background: var(--card); border: 1px solid var(--grid); border-radius: 12px; padding: 16px 18px; }
-  .card-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
-  .card-head h2 { font-size: 16px; margin: 0; }
-  .meta { color: var(--muted); font-size: 12.5px; }
-  .pill { margin-left: auto; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1.5px solid currentColor; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 14px 0 6px; }
-  .stat .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .stat .l { color: var(--ink2); font-size: 12px; }
-  .gauge { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 6px; position: relative; overflow: hidden; }
-  .gauge > i { position: absolute; inset: 0 auto 0 0; background: var(--blue); border-radius: 3px; }
-  .msg-now { margin-top: 8px; padding: 8px 10px; background: #f5f5f2; border-radius: 8px; color: var(--ink2); font-size: 13px; }
-  svg.chart { width: 100%; height: 190px; display: block; margin-top: 8px; }
-  .chart-wrap { position: relative; }
-  .tip { position: absolute; pointer-events: none; background: var(--ink); color: #fff; font-size: 12px; padding: 4px 8px;
-         border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); display: none; }
-  aside .card { position: sticky; top: 12px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
-  aside h2 { font-size: 16px; margin: 0 0 8px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-  .tabs button { border: 1px solid var(--grid); background: var(--surface); padding: 4px 10px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12.5px; }
-  .tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .feed { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-  .wa { background: #e7f6ec; border-radius: 10px 10px 10px 2px; padding: 8px 10px; font-size: 13.5px; }
-  .wa .t { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
-  .empty { color: var(--muted); padding: 20px 0; text-align: center; }
-  footer { color: var(--muted); font-size: 12px; padding: 0 28px 24px; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--deep); color: var(--paper); font: 15px/1.5 var(--body); overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--canal); outline-offset: 2px; }
+  a { color: var(--canal); }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: -.01em; }
 
-  .bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; padding:0 28px 6px; }
-  .bar button { font:inherit; font-size:13px; border:1px solid var(--grid); background:#fff; color:var(--ink); padding:5px 12px; border-radius:999px; cursor:pointer; }
-  .bar button.on, .bar button.primary { background:var(--ink); color:#fff; border-color:var(--ink); }
-  .bar .sep { width:1px; height:20px; background:var(--grid); margin:0 4px; }
-  .bar a { margin-left:auto; font-size:13.5px; }
-  .progress { height:4px; background:var(--grid); margin:4px 28px 0; border-radius:2px; overflow:hidden; }
-  .progress > i { display:block; height:100%; background:var(--good); width:0; }
-  .intro { margin:4px 28px 0; color:var(--ink2); max-width:900px; }
-  details.raw { margin-top:8px; font-size:12.5px; color:var(--ink2); }
-  details.raw summary { cursor:pointer; }
-  details.raw pre { background:#f5f5f2; padding:8px 10px; border-radius:8px; overflow:auto; margin:6px 0 0; font-size:11.5px; }
-  .offline { color:var(--critical); font-weight:600; }
-  .report { margin:12px 28px 0; }
-  .report table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; font-size:13.5px; }
-  .report th, .report td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--grid); }
-  .report th { color:var(--ink2); font-weight:600; font-size:12.5px; }
-  a { color:var(--blue); }
+  .shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+
+  /* ---------- sidebar ---------- */
+  .side { grid-row: 1 / -1; background: var(--slate); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 12px; gap: 4px; }
+  .brand { display: flex; gap: 10px; align-items: center; padding: 2px 8px 16px; text-decoration: none; color: inherit; }
+  .brand svg { width: 30px; height: 30px; flex: none; }
+  .brand b { font: 700 20px/1 var(--display); display: block; }
+  .brand span { color: var(--mute); font-size: 12px; }
+  .nav { display: flex; flex-direction: column; gap: 3px; }
+  .nav a { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px;
+           color: var(--mute); text-decoration: none; font-size: 14.5px; }
+  .nav a svg { width: 20px; height: 20px; }
+  .nav a:hover { background: var(--slate-2); color: var(--paper); }
+  .nav a[aria-current="page"] { background: #26405a; color: var(--paper); box-shadow: inset 3px 0 0 var(--canal); }
+  .nav small { grid-column: 2; color: var(--faint); font-size: 11.5px; margin-top: -4px; }
+  .side .bottom { margin-top: auto; display: grid; gap: 8px; font-size: 12.5px; color: var(--faint); padding: 0 8px; }
+
+  /* ---------- header ---------- */
+  .head { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 20px;
+          background: var(--slate); border-bottom: 1px solid var(--line); }
+  .head h1 { font-size: 20px; margin: 0; }
+  .head p { margin: 1px 0 0; color: var(--mute); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .transport { display: flex; align-items: center; gap: 8px; }
+  .clock { display: grid; gap: 3px; min-width: 210px; }
+  .clock b { font: 700 14.5px var(--display); font-variant-numeric: tabular-nums; }
+  .clock .note { color: var(--faint); font-size: 11.5px; }
+  .scrub { position: relative; height: 16px; cursor: pointer; touch-action: none; }
+  .scrub .track { position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--slate-3); }
+  .scrub .done { position: absolute; left: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--canal); }
+  .scrub .knob { position: absolute; top: 1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--paper); }
+  .scrub i { position: absolute; bottom: -3px; width: 2px; height: 5px; background: var(--canal); opacity: .8; border-radius: 1px; }
+  .btn { border: 1px solid var(--line); background: var(--slate-2); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+  .btn:hover { background: var(--slate-3); }
+  .btn.play { background: var(--paper); color: var(--slate); border-color: var(--paper); font-weight: 700; min-width: 70px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; padding: 6px 10px; cursor: pointer; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--slate-3); color: var(--paper); }
+  .solo { color: var(--mute); font-size: 13px; max-width: 360px; text-align: right; }
+
+  /* ---------- views ---------- */
+  .views { grid-column: 2; position: relative; min-height: 0; }
+  .view { position: absolute; inset: 0; display: none; }
+  .view.on { display: block; }
+  .view iframe { width: 100%; height: 100%; border: 0; display: block; background: #fcfcfb; }
+  .page { overflow: auto; height: 100%; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 26px 26px 48px; }
+  .section { margin-top: 34px; }
+  .section > h2 { font-size: 22px; margin: 0 0 4px; }
+  .section > .lede { color: var(--mute); margin: 0 0 16px; max-width: 70ch; }
+
+  /* overview: the farm right now */
+  .now { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 22px; align-items: end; }
+  .now h1 { font-size: clamp(30px, 4.2vw, 50px); line-height: 1.02; margin: 0 0 12px; }
+  .now .intro { color: var(--mute); font-size: 16px; max-width: 54ch; margin: 0; }
+  .wa-big { background: #dff3e4; color: #13261b; border-radius: 16px 16px 16px 4px; padding: 14px 16px; font-family: var(--odia); font-size: 17px; line-height: 1.5; }
+  .wa-big .who { font: 700 12.5px var(--body); color: #3d6b4c; margin-bottom: 4px; }
+  .wa-big .t { font: 12px var(--body); color: #4f6b58; margin-top: 6px; }
+  .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+  .fieldcard { text-align: left; cursor: pointer; background: var(--slate); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 10px; }
+  .fieldcard:hover { border-color: var(--canal); }
+  .fieldcard .top { display: flex; gap: 14px; align-items: center; }
+  .fieldcard h3 { margin: 0; font-size: 18px; }
+  .fieldcard .how { color: var(--faint); font-size: 12.5px; }
+  .status { display: inline-flex; gap: 6px; align-items: center; font-weight: 700; font-size: 13.5px; }
+  .status i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .fieldcard .why { color: var(--mute); font-size: 13px; min-height: 2.9em; }
+  .fieldcard .go { color: var(--canal); font-size: 13px; }
+
+  /* overview: choose a view */
+  .choose { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .door { display: flex; flex-direction: column; text-decoration: none; color: inherit; background: var(--slate); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .door:hover { border-color: var(--canal); }
+  .door .art { height: 116px; background: var(--slate-2); display: block; }
+  .door .art svg { width: 100%; height: 100%; display: block; }
+  .door .txt { padding: 12px 14px 14px; display: grid; gap: 4px; }
+  .door h3 { margin: 0; font-size: 17px; }
+  .door p { margin: 0; color: var(--mute); font-size: 13.5px; }
+
+  /* overview: pipeline */
+  .pipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; counter-reset: st; }
+  .stage { position: relative; padding: 14px 18px 14px 0; }
+  .stage::before { counter-increment: st; content: counter(st); font: 700 30px/1 var(--display); color: var(--canal); }
+  .stage:not(:last-child)::after { content: ""; position: absolute; top: 15px; left: 34px; right: 14px; height: 2px;
+       background: repeating-linear-gradient(90deg, var(--canal) 0 6px, transparent 6px 12px); opacity: .6; }
+  .stage h3 { margin: 6px 0 4px; font-size: 16px; }
+  .stage p { margin: 0 0 8px; color: var(--mute); font-size: 13.5px; }
+  .stage .here { font-size: 12.5px; color: var(--faint); }
+  .stage .here a { color: var(--canal); }
+
+  /* overview: latest */
+  .latest { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+  .events { display: grid; gap: 6px; }
+  .ev { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; background: var(--slate); border-radius: 10px; font-size: 13.5px; }
+  .ev .ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #10202c; }
+  .ev time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .kpi { background: var(--slate); border-radius: 14px; padding: 14px; }
+  .kpi .v { font: 700 26px var(--display); font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--mute); font-size: 13px; }
+
+  /* hardware lab */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--mute); font-weight: 700; font-size: 13px; }
+  td code, p code, li code { background: var(--slate-2); padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+  .stages3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .s3 { background: var(--slate); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .s3 .tagline { font-size: 12.5px; font-weight: 700; }
+  .s3 h3 { margin: 4px 0 6px; font-size: 18px; }
+  .s3 p { margin: 0; color: var(--mute); font-size: 13.5px; }
+  ol.steps { padding-left: 20px; margin: 0; display: grid; gap: 10px; }
+  ol.steps li { padding-left: 4px; }
+  .cmd { display: flex; align-items: center; gap: 8px; margin-top: 6px; background: #121b23; border: 1px solid var(--line); border-radius: 10px; padding: 8px 8px 8px 12px; }
+  .cmd code { flex: 1; font: 13px ui-monospace, "SF Mono", Menlo, monospace; color: #cfe3d6; white-space: pre-wrap; word-break: break-word; }
+  .cmd button { border: 1px solid var(--line); background: var(--slate-2); border-radius: 8px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+  .panel { background: var(--slate); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+
+  @media (max-width: 1050px) {
+    .choose { grid-template-columns: 1fr 1fr; } .pipe { grid-template-columns: 1fr 1fr; row-gap: 10px; } .stage:nth-child(2)::after { display: none; }
+    .now, .latest, .two { grid-template-columns: 1fr; } .stages3 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    body { overflow: hidden; }
+    .shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr) auto; }
+    .side { grid-row: 3; grid-column: 1; flex-direction: row; padding: 6px; border-right: 0; border-top: 1px solid var(--line); }
+    .side .brand, .side .bottom, .nav small { display: none; }
+    .nav { flex-direction: row; width: 100%; justify-content: space-around; }
+    .nav a { grid-template-columns: 1fr; justify-items: center; gap: 2px; font-size: 11px; padding: 6px 4px; }
+    .nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--canal); }
+    .head, .views { grid-column: 1; }
+    .head { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; gap: 8px; }
+    .head p { white-space: normal; }
+    .transport { flex-wrap: wrap; } .clock { min-width: 0; flex: 1 1 100%; }
+    .fields, .choose, .pipe, .kpis { grid-template-columns: 1fr; } .stage::after { display: none; }
+    .wrap { padding: 18px 14px 40px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>🌱 KrishiSense</h1>
-  <span class="sub">Live farm simulation</span>
-  <span class="badge">SIMULATION</span>
-  <span class="clock" id="clock">starting…</span>
-</header>
-<p class="intro">Three virtual solar sensor stations send soil readings every 15 minutes. The KrishiSense advisor decides
-  when to irrigate and for how long, and sends WhatsApp messages in Odia and English. Everything runs in this page:
-  no install, nothing sent to real phones. Farms and weather are simulated.</p>
-<div class="bar" style="margin-top:12px">
-  <button id="play" class="primary">⏸ Pause</button>
-  <span class="sep"></span>
-  <button data-speed="1">1 hour / s</button><button data-speed="6" class="on">6 hours / s</button><button data-speed="24">1 day / s</button>
-  <span class="sep"></span>
-  <button id="restart">↻ New weather</button>
-  <span class="muted" id="day" style="color:var(--muted);font-size:13px"></span>
-  <a href="farm3d.html">🧊 3D farm view</a>
-  <a href="season.html" style="margin-left:14px">Season comparison: KrishiSense vs fixed schedule →</a>
-</div>
-<div class="progress"><i id="prog"></i></div>
-<div class="report card" id="report" hidden></div>
-<main>
-  <section class="cards" id="cards"></section>
-  <aside>
-    <div class="card">
-      <h2>WhatsApp alerts sent</h2>
-      <div class="tabs" id="tabs">
-        <button data-lang="or" class="on">ଓଡ଼ିଆ</button><button data-lang="en">English</button><button data-lang="all">All</button>
-      </div>
-      <div class="feed" id="feed"><div class="empty">No alerts yet</div></div>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="#overview" aria-label="KrishiSense overview">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 29c0-9 2-15 10-22-9 1-15 6-15 13 0 3 2 6 5 9z" fill="#8ccb6a"/><path d="M16 29c0-6-3-10-9-12 0 6 3 10 9 12z" fill="#5ab0e6"/></svg>
+      <div><b>KrishiSense</b><span>Smart irrigation, Odisha</span></div>
+    </a>
+    <nav class="nav" aria-label="Views">
+      <a href="#overview" data-view="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Overview</a>
+      <a href="#live" data-view="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-6 4 4 4-7 5 9"/><path d="M3 21h18"/></svg>Live dashboard<small>Stations, charts, alerts</small></a>
+      <a href="#twin" data-view="twin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>3D twin<small>Explore and inspect</small></a>
+      <a href="#compare" data-view="compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>Season comparison<small>vs fixed schedule</small></a>
+      <a href="#hardware" data-view="hardware"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>Hardware lab<small>ESP32, Wokwi, server</small></a>
+    </nav>
+    <div class="bottom">
+      <a href="https://github.com/shaswatprof2000-git-hub/krishisense">Source code on GitHub</a>
+      <span>Farms, weather and messages are simulated. MIT licence. Shaswat Mohanty.</span>
     </div>
   </aside>
-</main>
-<footer>Soil water = share of plant-available water in the root zone (100% = field capacity, 0% = wilting point).
-The dashed line is the crop's refill point (FAO-56); orange lines are pump runs (by the farmer, or automatic).
-The chilli station loses its network on day 5 from 09:00 to 21:00: watch it buffer readings and the "no sensor data" alert.
-Source: <a href="https://github.com/shaswatprof2000-git-hub/krishisense">github.com/shaswatprof2000-git-hub/krishisense</a> · MIT licence · Shaswat Mohanty</footer>
+
+  <header class="head">
+    <div><h1 id="vtitle">Overview</h1><p id="vdesc"></p></div>
+    <div class="transport" id="transport">
+      <div class="clock">
+        <b id="clock">Day 1, 00:00</b>
+        <div class="scrub" id="scrub" role="slider" tabindex="0" aria-label="Season position, in days" aria-valuemin="1" aria-valuemax="60">
+          <div class="track"></div><div class="done" id="done"></div><div id="ticks"></div><div class="knob" id="knob"></div>
+        </div>
+      </div>
+      <button class="btn play" id="play">Pause</button>
+      <div class="seg" role="group" aria-label="Simulation speed">
+        <button data-speed="1" aria-pressed="false">1 hr/s</button><button data-speed="4" aria-pressed="true">4 hr/s</button><button data-speed="12" aria-pressed="false">12 hr/s</button>
+      </div>
+      <button class="btn" id="newwx" title="Start a new season with different weather">New weather</button>
+    </div>
+    <div class="solo" id="solo" hidden>This view runs its own what-if season, separate from the shared farm clock.</div>
+  </header>
+
+  <main class="views">
+    <!-- overview -->
+    <section class="view page" id="v-overview" aria-label="Overview">
+      <div class="wrap">
+        <div class="now">
+          <div>
+            <h1>When to water, and for how long.</h1>
+            <p class="intro">KrishiSense pairs a solar soil sensor with the rain forecast and sends each farmer one WhatsApp message a day,
+              in Odia, Hindi or English. Below are three simulated fields near Phulnakhara, running live in your browser.
+              Every view on this site shows the same farms at the same moment.</p>
+          </div>
+          <div class="wa-big" id="bigmsg" aria-live="polite"></div>
+        </div>
+        <div class="fields" id="fields"></div>
+
+        <div class="section">
+          <h2>Choose a view</h2>
+          <p class="lede">All four share one simulation, so pausing or jumping to a day here moves every view.</p>
+          <div class="choose">
+            <a class="door" href="#live"><span class="art"><svg viewBox="0 0 240 116" aria-hidden="true"><rect width="240" height="116" fill="#2a3946"/><g fill="none" stroke-width="2.5"><path d="M18 78 C50 60 70 66 96 52 S150 40 170 70 S210 58 224 46" stroke="#5ab0e6"/><path d="M18 64H224" stroke="#e8b931" stroke-dasharray="5 5" stroke-width="1.5"/></g><rect x="128" y="30" width="2" height="62" fill="#e8b931"/><rect x="18" y="92" width="64" height="8" rx="4" fill="#364857"/><rect x="18" y="92" width="44" height="8" rx="4" fill="#8ccb6a"/></svg></span>
+              <span class="txt"><h3>Live dashboard</h3><p>Every station at a glance: soil water charts, pump runs and the WhatsApp feed.</p></span></a>
+            <a class="door" href="#twin"><span class="art"><svg viewBox="0 0 240 116" aria-hidden="true"><rect width="240" height="116" fill="#2a3946"/><path d="M30 80 L110 54 L210 72 L130 102 Z" fill="#6b4a2b"/><path d="M38 80 L110 57 M58 86 L130 62 M80 92 L150 67 M102 98 L172 71" stroke="#3f8f3a" stroke-width="5" stroke-dasharray="2 7" stroke-linecap="round"/><rect x="186" y="34" width="3" height="40" fill="#a8b0b8"/><rect x="176" y="30" width="22" height="6" fill="#1b2f5e"/><path d="M188 34 Q150 6 112 26" stroke="#7cf0a8" stroke-width="2" fill="none" stroke-dasharray="3 5"/><rect x="96" y="20" width="22" height="16" fill="#e9e2d3"/><path d="M93 21 L107 10 L121 21Z" fill="#8e3b2c"/></svg></span>
+              <span class="txt"><h3>3D twin</h3><p>Fly around the farms, click a field and see its root zone, probes and advice.</p></span></a>
+            <a class="door" href="#compare"><span class="art"><svg viewBox="0 0 240 116" aria-hidden="true"><rect width="240" height="116" fill="#2a3946"/><rect x="58" y="44" width="34" height="56" rx="4" fill="#5ab0e6"/><rect x="100" y="16" width="34" height="84" rx="4" fill="#eb6834"/><rect x="152" y="70" width="34" height="30" rx="4" fill="#5ab0e6"/><rect x="194" y="62" width="0" height="0"/><text x="58" y="112" font-size="10" fill="#a9b4ae" font-family="sans-serif">water</text><text x="152" y="112" font-size="10" fill="#a9b4ae" font-family="sans-serif">stress</text></svg></span>
+              <span class="txt"><h3>Season comparison</h3><p>Pick a crop and soil, then compare KrishiSense with watering on a fixed schedule.</p></span></a>
+            <a class="door" href="#hardware"><span class="art"><svg viewBox="0 0 240 116" aria-hidden="true"><rect width="240" height="116" fill="#2a3946"/><rect x="84" y="26" width="72" height="64" rx="6" fill="#1b2f5e" stroke="#5ab0e6"/><rect x="104" y="44" width="32" height="28" rx="3" fill="#364857"/><g stroke="#a9b4ae" stroke-width="3"><path d="M96 26v-10M108 26v-10M120 26v-10M132 26v-10M144 26v-10M96 90v10M108 90v10M120 90v10M132 90v10M144 90v10"/></g><circle cx="58" cy="58" r="10" fill="none" stroke="#8ccb6a" stroke-width="3"/><path d="M68 58h16" stroke="#8ccb6a" stroke-width="3"/><path d="M156 58h22" stroke="#e8b931" stroke-width="3"/><rect x="178" y="48" width="20" height="20" rx="3" fill="#e8b931"/></svg></span>
+              <span class="txt"><h3>Hardware lab</h3><p>Run the real firmware on a virtual ESP32, then build the field station.</p></span></a>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>How the pieces connect</h2>
+          <p class="lede">The same four steps run on the real hardware and in this site's simulation.</p>
+          <div class="pipe">
+            <div class="stage"><h3>Measure</h3><p>A solar ESP32 station reads two soil probes, air temperature and its battery every 15 minutes, and keeps readings if the network drops.</p>
+              <div class="here">See it: <a href="#hardware">Hardware lab</a>, or open a station in the <a href="#twin">3D twin</a></div></div>
+            <div class="stage"><h3>Collect</h3><p>Readings travel over Wi-Fi or 4G to a gateway: a Raspberry Pi on the farm, or any server.</p>
+              <div class="here">See it: data dots flying to the gateway in the <a href="#twin">3D twin</a></div></div>
+            <div class="stage"><h3>Decide</h3><p>The advisor tracks the root-zone water balance (FAO-56) against the rain forecast and works out pump minutes.</p>
+              <div class="here">See it: soil water charts in the <a href="#live">Live dashboard</a></div></div>
+            <div class="stage"><h3>Advise</h3><p>The farmer gets one clear WhatsApp message, or the pump relay switches automatically, with a safety cap.</p>
+              <div class="here">See it: the WhatsApp feed in the <a href="#live">Live dashboard</a></div></div>
+          </div>
+        </div>
+
+        <div class="section latest">
+          <div>
+            <h2 style="margin:0 0 12px;font-size:22px">What just happened</h2>
+            <div class="events" id="events"></div>
+          </div>
+          <div>
+            <h2 style="margin:0 0 12px;font-size:22px">This season so far</h2>
+            <div class="kpis" id="kpis"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- embedded views (loaded on first visit, then kept alive) -->
+    <section class="view" id="v-live" aria-label="Live dashboard"></section>
+    <section class="view" id="v-twin" aria-label="3D twin"></section>
+    <section class="view" id="v-compare" aria-label="Season comparison"></section>
+
+    <!-- hardware lab -->
+    <section class="view page" id="v-hardware" aria-label="Hardware lab">
+      <div class="wrap">
+        <h2 style="font-size:30px;margin:0 0 6px">Build it in three stages</h2>
+        <p class="lede" style="color:var(--mute);max-width:70ch;margin:0 0 18px">Nothing needs to be bought until the software has proven itself. Each stage runs the same code as the next.</p>
+        <div class="stages3">
+          <div class="s3"><div class="tagline" style="color:var(--paddy)">Running on this site</div><h3>1. Software simulation</h3><p>Virtual stations, the advisor and the alerts run in your browser, and in Python with <code>python -m krishisense sim</code>.</p></div>
+          <div class="s3"><div class="tagline" style="color:var(--canal)">In VS Code</div><h3>2. Virtual hardware</h3><p>The real ESP32 firmware runs on a simulated board in Wokwi, with sliders for the soil probes, and talks to your server.</p></div>
+          <div class="s3"><div class="tagline" style="color:var(--turmeric)">In the field</div><h3>3. Real station</h3><p>A solar ESP32 with two capacitive soil probes, a BME280 and an optional pump relay. Roughly ₹2,000–3,500 in parts.</p></div>
+        </div>
+
+        <div class="section two">
+          <div class="panel">
+            <h2 style="margin:0 0 4px;font-size:20px">The virtual board</h2>
+            <p style="color:var(--mute);margin:0 0 10px;font-size:14px"><code>diagram.json</code> wires the Wokwi ESP32 like the field station.</p>
+            <table>
+              <tr><th>Real station</th><th>Virtual board</th><th>Pin</th></tr>
+              <tr><td>Soil probe, 15 cm</td><td>Slide potentiometer (up = drier)</td><td>GPIO34</td></tr>
+              <tr><td>Soil probe, 30 cm</td><td>Slide potentiometer</td><td>GPIO35</td></tr>
+              <tr><td>BME280 air sensor</td><td>DHT22 (Wokwi has no BME280)</td><td>GPIO27</td></tr>
+              <tr><td>Battery divider</td><td>Rotary potentiometer</td><td>GPIO33</td></tr>
+              <tr><td>Sensor power switch</td><td>Green LED</td><td>GPIO25</td></tr>
+              <tr><td>Pump relay</td><td>Relay module + blue LED</td><td>GPIO26</td></tr>
+            </table>
+            <p style="color:var(--faint);font-size:12.5px;margin:10px 0 0">The virtual board reads every 15 seconds instead of 15 minutes, and each pump minute lasts one second.</p>
+          </div>
+          <div class="panel">
+            <h2 style="margin:0 0 10px;font-size:20px">Run it in VS Code</h2>
+            <ol class="steps">
+              <li>Open the repo in VS Code and install the recommended extensions: Wokwi Simulator, PlatformIO and Python.</li>
+              <li>Get a free Wokwi licence for open-source projects: press F1 and choose <b>Wokwi: Request a new License</b>.</li>
+              <li>Build the firmware for the virtual board:<div class="cmd"><code>cd firmware && pio run -e wokwi</code><button data-copy>Copy</button></div></li>
+              <li>Start the server the board will talk to:<div class="cmd"><code>cd server && python -m krishisense --config stations.wokwi.json --db wokwi.db serve</code><button data-copy>Copy</button></div></li>
+              <li>Open <code>diagram.json</code>, press F1 and choose <b>Wokwi: Start Simulator</b>. Then open <code>localhost:8080</code> and slide the probes up to dry the soil.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="section two">
+          <div class="panel">
+            <h2 style="margin:0 0 10px;font-size:20px">Run the Python simulation</h2>
+            <p style="color:var(--mute);margin:0;font-size:14px">The same three farms, with the real server and dashboard on your computer.</p>
+            <div class="cmd"><code>cd server && pip install -e ".[dev]"</code><button data-copy>Copy</button></div>
+            <div class="cmd"><code>python -m krishisense sim --days 14 --speed 3600</code><button data-copy>Copy</button></div>
+            <div class="cmd"><code>pytest -q</code><button data-copy>Copy</button></div>
+          </div>
+          <div class="panel">
+            <h2 style="margin:0 0 10px;font-size:20px">The real field station</h2>
+            <table>
+              <tr><th>Part</th><th>Job</th></tr>
+              <tr><td>ESP32 DevKit</td><td>Reads sensors, buffers 24 h offline, uploads</td></tr>
+              <tr><td>2 capacitive soil probes</td><td>Soil water at 15 cm and 30 cm</td></tr>
+              <tr><td>BME280</td><td>Air temperature, humidity, pressure</td></tr>
+              <tr><td>Solar panel, 18650 cell, charger</td><td>Power, all season</td></tr>
+              <tr><td>Relay + contactor (phase 2)</td><td>Automatic pump control, installed by an electrician</td></tr>
+            </table>
+            <p style="margin:10px 0 0;font-size:14px"><a href="https://github.com/shaswatprof2000-git-hub/krishisense/blob/main/hardware/README.md">Full parts list, wiring, calibration and pump safety</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
 
 <script src="farm-engine.js"></script>
 <script>
-const STATUS = {
-  OK:            { label: "✅ Soil OK",            color: "var(--good)" },
-  IRRIGATE_SOON: { label: "⏰ Irrigate tomorrow", color: "var(--warn)" },
-  IRRIGATE_NOW:  { label: "💧 Irrigate now",      color: "var(--serious)" },
-  SKIP_RAIN:     { label: "🌧️ Skip: rain due",    color: "var(--info)" },
-  SENSOR_STALE:  { label: "⚠️ No data",           color: "var(--critical)" },
-  NO_DATA:       { label: "⚠️ No data yet",       color: "var(--critical)" },
-};
-const SEASON_DAYS = 60;
-let lang = "or", farm, speed = 6, playing = true, carry = 0, seed = 7;
-const $ = (s, el = document) => el.querySelector(s);
-const fmtTime = ts => new Date(ts * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+(() => {
+// ---- one shared season for every view ----
+const season = new KSFarm.Season({ seed: 7, days: 60, warmupHours: 30, speed: 4 });
+window.KSHub = { season, go };             // embedded pages find the shared season here
+
+const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const get = path => farm.api(path);   // same calls the live server answers
+const SEASON = 60, DAY = 86400, EPOCH = KSFarm.SIM_EPOCH;
+const COLOR = { OK: "#8ccb6a", IRRIGATE_SOON: "#e8b931", IRRIGATE_NOW: "#e0533d", SKIP_RAIN: "#5ab0e6", SENSOR_STALE: "#c084fc", NO_DATA: "#c084fc" };
+const HOW = { "sim-tomato": "Farmer follows the WhatsApp advice", "sim-groundnut": "Pump switched automatically", "sim-chilli": "Network drops on day 5" };
+const VIEWS = {
+  overview: { title: "Overview", desc: "Three simulated farms near Phulnakhara, live in your browser." },
+  live: { title: "Live dashboard", desc: "Every station's soil water, pump runs and WhatsApp alerts.", src: "live.html" },
+  twin: { title: "3D twin", desc: "Drag to orbit, click a field to inspect it. Press H for help.", src: "farm3d.html" },
+  compare: { title: "Season comparison", desc: "KrishiSense advice against watering on a fixed schedule.", src: "season.html", solo: true },
+  hardware: { title: "Hardware lab", desc: "From the virtual ESP32 to the station in the field." },
+};
 
-function start(newSeed) {
-  seed = newSeed; farm = new KSFarm.Farm({ seed, days: SEASON_DAYS });
-  farm.run(48);                         // two days of history so the charts are not empty
-  $("#cards").innerHTML = ""; $("#report").hidden = true; carry = 0;
-  setPlaying(true); refresh();
-}
-function setPlaying(p) { playing = p; $("#play").textContent = p ? "⏸ Pause" : "▶ Play"; }
-function cardSkeleton(st) {
-  const el = document.createElement("div");
-  el.className = "card"; el.id = "card-" + st.station_id;
-  el.innerHTML = `
-    <div class="card-head"><h2>${esc(st.name)}</h2>
-      <span class="meta">${esc(st.crop)} · ${esc(st.stage)} · ${esc(st.soil.replace(/_/g, " "))} · ${st.area_m2} m² · ${esc(st.irrigation_method)}${st.auto_pump ? " · auto pump" : ""}</span>
-      <span class="pill">…</span></div>
-    <div class="stats">
-      <div class="stat"><div class="v" data-k="water">–</div><div class="l">soil water</div><div class="gauge"><i data-k="gauge"></i></div></div>
-      <div class="stat"><div class="v" data-k="pump">–</div><div class="l">pump time advised</div></div>
-      <div class="stat"><div class="v" data-k="rain">–</div><div class="l">rain forecast (24 h)</div></div>
-      <div class="stat"><div class="v" data-k="etc">–</div><div class="l">crop water use / day</div></div>
-      <div class="stat"><div class="v" data-k="batt">–</div><div class="l">battery · last reading</div></div>
-    </div>
-    <div class="chart-wrap"><svg class="chart" viewBox="0 0 640 190" preserveAspectRatio="none"></svg><div class="tip"></div></div>
-    <div class="msg-now" data-k="msg"></div>
-    <details class="raw"><summary>Last upload from the (virtual) ESP32</summary><pre data-k="raw"></pre></details>`;
-  return el;
-}
-
-function drawChart(svg, tip, hist, pumps, refill, clock) {
-  const W = 640, H = 190, L = 34, R = 8, T = 10, B = 22;
-  if (!hist.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#8a8984">no readings yet</text>`; return; }
-  const t0 = hist[0].ts, t1 = Math.max(clock, hist[hist.length - 1].ts), span = Math.max(1, t1 - t0);
-  const x = t => L + (W - L - R) * (t - t0) / span, y = v => T + (H - T - B) * (1 - v / 110);
-  let g = "";
-  for (const v of [0, 50, 100]) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e6e5e0"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#8a8984">${v}%</text>`;
-  const dayMs = 86400, off = 19800;
-  for (let d = Math.ceil((t0 + off) / dayMs) * dayMs - off; d <= t1; d += dayMs) {
-    g += `<line x1="${x(d)}" x2="${x(d)}" y1="${T}" y2="${H - B}" stroke="#f0efea"/>`;
-    g += `<text x="${x(d) + 3}" y="${H - 6}" font-size="10" fill="#8a8984">${new Date(d * 1000).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}</text>`;
+// ---- routing ----
+let current = null;
+function go(name) {
+  if (!VIEWS[name]) name = "overview";
+  if (location.hash.slice(1) !== name) { history.replaceState(null, "", "#" + name); }
+  current = name;
+  const v = VIEWS[name], sec = document.getElementById("v-" + name);
+  if (v.src && !sec.querySelector("iframe")) {
+    const f = document.createElement("iframe"); f.src = v.src; f.title = v.title; sec.appendChild(f);
   }
-  g += `<line x1="${L}" x2="${W - R}" y1="${y(refill)}" y2="${y(refill)}" stroke="#c4471f" stroke-dasharray="4 4" stroke-width="1.2"/>`;
-  g += `<text x="${W - R - 2}" y="${y(refill) - 4}" text-anchor="end" font-size="10" fill="#52514e">refill point ${refill}%</text>`;
-  for (const p of pumps) g += `<line x1="${x(p.issued_at)}" x2="${x(p.issued_at)}" y1="${T}" y2="${H - B}" stroke="#eb6834" stroke-width="1.5"><title>${fmtTime(p.issued_at)}: pump ${p.minutes} min (${p.source})</title></line>`;
-  const d = hist.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.water_pct).toFixed(1)}`).join("");
-  g += `<path d="${d}" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>`;
-  g += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="#0b0b0b" stroke-width="1" opacity="0"/><circle class="dot" r="4" fill="#2a78d6" stroke="#fff" stroke-width="2" opacity="0"/>`;
-  g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" class="hit"/>`;
-  svg.innerHTML = g;
-  const hit = $(".hit", svg), xh = $(".xh", svg), dot = $(".dot", svg);
-  hit.onmousemove = ev => {
-    const box = svg.getBoundingClientRect(), px = (ev.clientX - box.left) * W / box.width;
-    const t = t0 + (px - L) / (W - L - R) * span;
-    let best = hist[0]; for (const p of hist) if (Math.abs(p.ts - t) < Math.abs(best.ts - t)) best = p;
-    xh.setAttribute("x1", x(best.ts)); xh.setAttribute("x2", x(best.ts)); xh.setAttribute("opacity", .35);
-    dot.setAttribute("cx", x(best.ts)); dot.setAttribute("cy", y(best.water_pct)); dot.setAttribute("opacity", 1);
-    tip.style.display = "block";
-    tip.style.left = (x(best.ts) / W * box.width) + "px"; tip.style.top = (y(best.water_pct) / H * box.height) + "px";
-    tip.textContent = `${fmtTime(best.ts)} · soil water ${best.water_pct}% · ${best.air_temp_c ?? "–"} °C`;
-  };
-  hit.onmouseleave = () => { tip.style.display = "none"; xh.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); };
+  document.querySelectorAll(".view").forEach(el => el.classList.toggle("on", el === sec));
+  document.querySelectorAll(".nav a").forEach(a => { if (a.dataset.view === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  $("#vtitle").textContent = v.title; $("#vdesc").textContent = v.desc;
+  $("#transport").style.display = v.solo ? "none" : "flex"; $("#solo").hidden = !v.solo;
+  document.title = name === "overview" ? "KrishiSense" : `KrishiSense · ${v.title}`;
+  if (name === "overview") renderOverview(true);
 }
+addEventListener("hashchange", () => go(location.hash.slice(1)));
 
-function refresh() {
-  const info = get("/api/v1/stations");
-  const day = KSFarm.simDay(info.clock) + 1;
-  $("#clock").textContent = "Simulated time: " + fmtTime(info.clock);
-  $("#day").textContent = `Day ${Math.min(day, SEASON_DAYS)} of ${SEASON_DAYS} · weather #${seed}`;
-  $("#prog").style.width = Math.min(100, 100 * (info.clock - KSFarm.SIM_EPOCH) / (SEASON_DAYS * 86400)) + "%";
-  const cards = $("#cards");
-  for (const st of info.stations) {
-    let el = document.getElementById("card-" + st.station_id);
-    if (!el) { el = cardSkeleton(st); cards.appendChild(el); }
-    const adv = get(`/api/v1/advice?station_id=${st.station_id}`);
-    const hist = get(`/api/v1/history?station_id=${st.station_id}&days=7`);
-    const pumps = get(`/api/v1/pump?station_id=${st.station_id}&days=7`);
-    const s = STATUS[adv.status] || { label: adv.status, color: "var(--ink2)" };
-    const pill = $(".pill", el); pill.textContent = s.label + (adv.urgent ? " · URGENT" : ""); pill.style.color = s.color;
-    const w = adv.available_water_pct;
-    $('[data-k="water"]', el).textContent = w == null ? "–" : w + "%";
-    $('[data-k="gauge"]', el).style.width = Math.min(100, w || 0) + "%";
-    $('[data-k="pump"]', el).textContent = adv.pump_minutes ? adv.pump_minutes + " min" : "–";
-    $('[data-k="rain"]', el).textContent = `${adv.rain_next_24h_mm} mm · ${Math.round(adv.rain_prob_pct)}%`;
-    $('[data-k="etc"]', el).textContent = adv.etc_mm_day == null ? "–" : adv.etc_mm_day + " mm";
-    $('[data-k="batt"]', el).textContent = `${adv.battery_v ?? "–"} V · ${adv.hours_since_reading ?? "–"} h`;
-    const f = farm.fields[st.station_id];
-    const net = f.online === false ? `<span class="offline">📵 Network down: ${f.buffer.length} readings waiting in the station's memory.</span> ` : "";
-    $('[data-k="msg"]', el).innerHTML = net + esc(adv.notes && adv.notes.length ? "Note: " + adv.notes.join("; ") : "");
-    $('[data-k="raw"]', el).textContent = f.lastUpload
-      ? `POST /api/v1/readings   (X-Device-Key: ••••)\n` + JSON.stringify({ ...f.lastUpload, sent: undefined }, null, 1) +
-        (f.lastUpload.sent > 1 ? `\n(+ ${f.lastUpload.sent - 1} buffered readings sent in the same upload)` : "")
-      : "no upload yet";
-    drawChart($("svg", el), $(".tip", el), hist, pumps, st.refill_line_pct, info.clock);
+// ---- header: shared clock and transport ----
+function drawTicks() {
+  let g = ""; for (let d = 0; d < SEASON; d++) { const w = season.farm.weather.day(d); if (w.rain_mm > 0) g += `<i style="left:${(d + .6) / SEASON * 100}%"></i>`; }
+  $("#ticks").innerHTML = g;
+}
+function renderHead() {
+  const ts = season.farm.ts, p = (ts - EPOCH) / (SEASON * DAY) * 100;
+  $("#clock").textContent = KSFarm.fmtSim(ts) + (season.farm.finished ? ", season complete" : "");
+  $("#done").style.width = p + "%"; $("#knob").style.left = p + "%";
+  $("#scrub").setAttribute("aria-valuenow", KSFarm.simDay(ts) + 1);
+  $("#play").textContent = season.playing ? "Pause" : season.farm.finished ? "Replay" : "Play";
+  document.querySelectorAll("[data-speed]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.speed === season.speed));
+}
+$("#play").onclick = () => { if (season.farm.finished) { season.restart(season.seed); season.setPlaying(true); } else season.setPlaying(!season.playing); };
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => season.setSpeed(+b.dataset.speed));
+$("#newwx").onclick = () => season.restart(1 + Math.floor(Math.random() * 999));
+season.on("restart", () => { drawTicks(); renderHead(); renderOverview(true); });
+season.on("state", renderHead);
+const scrub = $("#scrub");
+const scrubTo = ev => { const r = scrub.getBoundingClientRect(); season.seek(EPOCH + Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * SEASON * DAY); renderHead(); };
+let dragging = false, wasPlaying = true;
+scrub.addEventListener("pointerdown", e => { dragging = true; wasPlaying = season.playing; season.playing = false; scrub.setPointerCapture(e.pointerId); scrubTo(e); });
+scrub.addEventListener("pointermove", e => { if (dragging) scrubTo(e); });
+scrub.addEventListener("pointerup", () => { dragging = false; season.setPlaying(wasPlaying && !season.farm.finished); });
+scrub.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") { season.seek(season.farm.ts + DAY); e.preventDefault(); }
+  if (e.key === "ArrowLeft") { season.seek(season.farm.ts - DAY); e.preventDefault(); }
+  renderHead();
+});
+
+// ---- overview ----
+const ring = (pct, refill, color) => {
+  const s = 58, r = 23, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0)) / 100;
+  const rx = s / 2 + r * Math.sin(refill / 100 * 2 * Math.PI), ry = s / 2 - r * Math.cos(refill / 100 * 2 * Math.PI);
+  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" aria-hidden="true"><circle cx="29" cy="29" r="${r}" fill="none" stroke="#364857" stroke-width="6"/>
+    <circle cx="29" cy="29" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 29 29)"/>
+    <circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="2.6" fill="#eef1ea"/>
+    <text x="29" y="31" text-anchor="middle" dominant-baseline="middle" font-size="15" font-weight="700" fill="#eef1ea">${pct == null ? "–" : Math.round(pct)}</text></svg>`;
+};
+const ICON = { pump: ["#e8b931", "P"], net: ["#c084fc", "!"], alert: ["#8ccb6a", "W"], rain: ["#5ab0e6", "R"] };
+let lastOverview = 0, shownVersion = -1;
+function renderOverview(force) {
+  if (current !== "overview") return;
+  const now = performance.now(); if (!force && now - lastOverview < 450) return; lastOverview = now;
+  const farm = season.farm;
+  $("#fields").innerHTML = season.ids().map(id => {
+    const st = farm.stations.find(s => s.station_id === id), adv = farm.api(`/api/v1/advice?station_id=${id}`), col = COLOR[adv.status];
+    const refill = Math.round(100 * (1 - KSFarm.CROPS[st.crop][4]));
+    const why = { OK: adv.notes.find(n => n.startsWith("about")) ? `Enough water. ${adv.notes.find(n => n.startsWith("about")).replace("about", "About")}.` : "Enough water in the root zone.",
+      IRRIGATE_SOON: `Will cross the refill line by tomorrow. About ${adv.pump_minutes} min of pumping.`,
+      IRRIGATE_NOW: `Past the refill line. Pump ${adv.pump_minutes} minutes.`,
+      SKIP_RAIN: `About ${adv.rain_next_24h_mm} mm of rain is likely, so no watering.`,
+      SENSOR_STALE: `No reading for ${Math.floor(adv.hours_since_reading)} h. The station is saving readings.`, NO_DATA: "Waiting for data." }[adv.status];
+    return `<button class="fieldcard" data-id="${id}" aria-label="Open the ${KSFarm.SHORT[id]} field in the 3D twin">
+      <span class="top">${ring(adv.available_water_pct, refill, col)}<span><h3>${KSFarm.SHORT[id]}</h3><span class="how">${HOW[id]}</span></span></span>
+      <span class="status" style="color:${col}"><i></i>${KSFarm.WORD[adv.status]}${season.pumpActive(id) ? ", pump running" : ""}</span>
+      <span class="why">${esc(why)}</span><span class="go">Inspect in 3D</span></button>`;
+  }).join("");
+  const a = farm.alerts.find(x => x.recipient === "SIMULATED-or");
+  $("#bigmsg").innerHTML = a ? `<div class="who">Latest WhatsApp message to a farmer</div>${esc(a.text)}<div class="t">${KSFarm.fmtSim(a.sent_at)}</div>`
+    : `<div class="who">Latest WhatsApp message to a farmer</div>No alerts yet. The fields have enough water.`;
+  if (season.version !== shownVersion || force) {
+    shownVersion = season.version;
+    $("#events").innerHTML = season.events.slice(0, 7).map(e => { const [c, l] = ICON[e.kind];
+      return `<div class="ev"><span class="ic" style="background:${e.kind === "alert" ? COLOR[e.status] : c}">${l}</span><span>${esc(e.text)}</span><time>${KSFarm.fmtSim(e.ts)}</time></div>`; }).join("")
+      || `<div class="ev"><span></span><span style="color:var(--faint)">Pump runs, alerts, rain and network drops appear here.</span><span></span></div>`;
   }
-  const alerts = get("/api/v1/alerts?limit=60");
-  const isOdia = t => /[\u0B00-\u0B7F]/.test(t);
-  const shown = alerts.filter(a => lang === "all" || (lang === "or") === isOdia(a.text));
-  $("#feed").innerHTML = shown.length ? shown.map(a =>
-    `<div class="wa">${esc(a.text)}<div class="t">${fmtTime(a.sent_at)} → ${esc(a.recipient)}</div></div>`).join("")
-    : `<div class="empty">No alerts yet</div>`;
-  if (farm.finished) showReport();
+  const sum = farm.summary(), water = sum.reduce((t, r) => t + r.water_m3, 0), runs = sum.reduce((t, r) => t + r.pump_runs, 0);
+  const alertsSent = farm.alerts.filter(x => x.recipient === "SIMULATED-or").length, rain = sum[0].rain_mm;
+  $("#kpis").innerHTML = [[`${water.toFixed(0)} m³`, `water pumped across 3 fields, in ${runs} runs`], [`${alertsSent}`, "WhatsApp alerts sent to farmers"],
+    [`${rain.toFixed(0)} mm`, "rain so far"], [`${KSFarm.simDay(farm.ts) + 1} of ${SEASON}`, "days into the season"]]
+    .map(([v, l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
 }
-function showReport() {
-  if (!$("#report").hidden) return;
-  setPlaying(false);
-  const rows = farm.summary().map(r => `<tr><td>${esc(r.name)}</td><td>${r.water_m3} m³</td><td>${r.pump_runs}</td><td>${r.rain_mm} mm</td>
-    <td>${r.stress_hours} h</td><td>${r.max_buffered_readings}</td></tr>`).join("");
-  $("#report").innerHTML = `<h2 style="margin:0 0 8px;font-size:16px">Season report: ${SEASON_DAYS} simulated days</h2>
-    <table><tr><th>Field</th><th>Water pumped</th><th>Pump runs</th><th>Rain</th><th>Hours below refill point</th><th>Most readings buffered offline</th></tr>${rows}</table>
-    <p class="meta" style="margin:8px 0 0">Simulated, illustrative numbers. Press "New weather" to run another season.</p>`;
-  $("#report").hidden = false;
-}
+$("#fields").addEventListener("click", e => { const b = e.target.closest(".fieldcard"); if (!b) return; season.select(b.dataset.id); go("twin"); });
 
-let last = performance.now(), lastDraw = 0;
+// ---- copy buttons ----
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.previousElementSibling.textContent); b.textContent = "Copied"; }
+  catch (err) { b.textContent = "Select and copy"; }
+  setTimeout(() => { b.textContent = "Copy"; }, 1600);
+});
+
+// ---- keyboard ----
+addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea, [role=slider]")) return;
+  if (e.key === " " && current !== "compare") { e.preventDefault(); $("#play").click(); }
+});
+
+// ---- main loop: the hub drives the shared clock for every view ----
+let last = performance.now(), headTimer = 0;
 function loop(now) {
-  const dt = Math.min(0.25, (now - last) / 1000); last = now;
-  if (playing && !farm.finished) {
-    carry += dt * speed * 3600;
-    while (carry >= KSFarm.STEP_S && farm.tick()) carry -= KSFarm.STEP_S;
-  }
-  if (now - lastDraw > 400) { lastDraw = now; refresh(); }
+  const dt = Math.min(0.2, (now - last) / 1000); last = now;
+  season.advance(dt);
+  headTimer -= dt; if (headTimer <= 0) { headTimer = 0.25; renderHead(); }
+  renderOverview(false);
   requestAnimationFrame(loop);
 }
-$("#play").onclick = () => { if (farm.finished) start(seed); else setPlaying(!playing); };
-document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
-  speed = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b));
-});
-$("#restart").onclick = () => start(1 + Math.floor(Math.random() * 999));
-$("#tabs").onclick = e => {
-  if (!e.target.dataset.lang) return;
-  lang = e.target.dataset.lang;
-  for (const b of $("#tabs").children) b.classList.toggle("on", b === e.target);
-  refresh();
-};
-start(7);
+drawTicks(); renderHead();
+go(location.hash.slice(1) || "overview");
 requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>

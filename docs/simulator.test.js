@@ -48,3 +48,18 @@ for (const st of info.stations) {
   assert(typeof farm.api(`/api/v1/advice?station_id=${st.station_id}`).status === "string");
 }
 console.log("live farm OK:", farm.summary().map(s => `${s.station_id} ${s.water_m3} m3, ${s.pump_runs} runs`).join("; "));
+
+// ---- shared Season (used by the hub so every view shows the same farm) ----
+const S = new KSFarm.Season({ seed: 7, days: 30 });
+assert(S.farm.ts > KSFarm.SIM_EPOCH && S.events.length >= 0, "season starts warmed up");
+S.speed = 24; for (let i = 0; i < 200; i++) S.advance(0.1);       // ~20 simulated days
+const tLate = S.farm.ts;
+assert(S.events.some(e => e.kind === "net") && S.events.some(e => e.kind === "pump"), "events recorded");
+const statusLate = S.farm.api("/api/v1/advice?station_id=sim-tomato").available_water_pct;
+S.seek(KSFarm.SIM_EPOCH + 3 * 86400);
+assert(S.farm.ts <= KSFarm.SIM_EPOCH + 3 * 86400 && S.farm.ts > KSFarm.SIM_EPOCH + 2.9 * 86400, "seek back");
+S.seek(tLate);
+assert.equal(S.farm.api("/api/v1/advice?station_id=sim-tomato").available_water_pct, statusLate, "replay is deterministic");
+let selected = null; S.on("select", id => selected = id); S.select("sim-chilli");
+assert.equal(selected, "sim-chilli");
+console.log("season OK:", KSFarm.fmtSim(S.farm.ts), `${S.events.length} events`);

@@ -302,6 +302,75 @@
     }
   }
 
-  const KSFarm = { Farm, Weather, advise, render, demoStations, CROPS, SOILS, EFF, SIM_EPOCH, STEP_S, simDay, simHour };
+
+  // ---- Season: one shared, playable simulation with time travel and an event log ------------------
+  // The hub page owns one Season; every embedded view reads it, so all views stay in step.
+  const SHORT = { "sim-tomato": "Tomato", "sim-groundnut": "Groundnut", "sim-chilli": "Chilli" };
+  const WORD = { OK: "Soil OK", IRRIGATE_SOON: "Water tomorrow", IRRIGATE_NOW: "Water now", SKIP_RAIN: "Skip, rain due",
+                 SENSOR_STALE: "No sensor data", NO_DATA: "Waiting for data" };
+  class Season {
+    constructor({ seed = 7, days = 60, warmupHours = 30, speed = 4 } = {}) {
+      this.days = days; this.warmupHours = warmupHours; this.speed = speed; this.playing = true; this.carry = 0;
+      this.selected = "sim-tomato"; this.listeners = {}; this.version = 0;
+      this.restart(seed);
+    }
+    on(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); }
+    emit(ev, ...a) { (this.listeners[ev] || []).forEach(fn => { try { fn(...a); } catch (e) { console.error(e); } }); }
+    ids() { return this.farm.stations.map(s => s.station_id); }
+    snapshot() {
+      const s = { alert: this.farm.alerts[0] };
+      for (const id of this.ids()) { const f = this.farm.fields[id]; s[id] = { pumps: f.pumps.length, online: f.online !== false }; }
+      return s;
+    }
+    pushEvent(e) { this.events.unshift(e); if (this.events.length > 80) this.events.pop(); this.version++; }
+    step() {
+      if (!this.farm.tick()) return false;
+      const now = this.farm.ts, h = simHour(now), w = this.weather().day(simDay(now)), prev = this.prev;
+      for (const id of this.ids()) {
+        const f = this.farm.fields[id], p = prev[id];
+        if (f.pumps.length > p.pumps) { const pu = f.pumps[f.pumps.length - 1];
+          this.pushEvent({ ts: now, id, kind: "pump", text: `${SHORT[id]}: pump on for ${pu.minutes} min (${pu.source === "farmer" ? "farmer" : "automatic"})` }); }
+        const online = f.online !== false;
+        if (!online && p.online) this.pushEvent({ ts: now, id, kind: "net", text: `${SHORT[id]}: network lost, saving readings` });
+        if (online && !p.online) this.pushEvent({ ts: now, id, kind: "net", text: `${SHORT[id]}: back online, ${f.lastUpload ? f.lastUpload.sent : "?"} readings sent at once` });
+      }
+      const fresh = [];
+      for (const a of this.farm.alerts) { if (a === prev.alert) break; if (a.recipient === "SIMULATED-en") fresh.push(a); }
+      fresh.reverse().forEach(a => this.pushEvent({ ts: a.sent_at, id: a.station_id, kind: "alert", status: a.status,
+        text: `${SHORT[a.station_id]}: WhatsApp sent, ${WORD[a.status].toLowerCase()}` }));
+      if (Math.abs(h - 15) < 1e-6 && w.rain_mm > 0) this.pushEvent({ ts: now, id: null, kind: "rain", text: `Rain shower, ${w.rain_mm.toFixed(0)} mm` });
+      this.prev = this.snapshot();
+      return true;
+    }
+    weather() { return this.farm.weather; }
+    restart(seed = this.seed) {
+      this.seed = seed; this.farm = new Farm({ seed, days: this.days }); this.events = []; this.carry = 0; this.version++;
+      this.prev = this.snapshot();
+      for (let i = 0; i < this.warmupHours * 4; i++) this.step();
+      this.emit("restart");
+    }
+    seek(ts) {                                   // time travel: replay the season (it is deterministic) to any moment
+      ts = Math.max(SIM_EPOCH + STEP_S, Math.min(SIM_EPOCH + this.days * DAY, ts));
+      if (ts < this.farm.ts) { this.farm = new Farm({ seed: this.seed, days: this.days }); this.events = []; this.prev = this.snapshot(); this.emit("restart"); }
+      while (this.farm.ts + STEP_S <= ts && this.step());
+      this.carry = 0; this.version++; this.emit("seek");
+    }
+    advance(dt) {                                // call every frame with real seconds elapsed
+      if (this.playing && !this.farm.finished) {
+        this.carry += dt * this.speed * 3600;
+        while (this.carry >= STEP_S && this.step()) this.carry -= STEP_S;
+      }
+      if (this.farm.finished && this.playing) this.setPlaying(false);
+    }
+    setPlaying(p) { this.playing = p; this.emit("state"); }
+    setSpeed(s) { this.speed = s; this.emit("state"); }
+    select(id) { if (!this.farm.fields[id]) return; this.selected = id; this.emit("select", id); }
+    pumpActive(id) { const f = this.farm.fields[id], p = f.pumps[f.pumps.length - 1];
+      return !!p && this.farm.ts >= p.issued_at && this.farm.ts < p.issued_at + p.minutes * 60; }
+  }
+  const fmtSim = ts => { const d = simDay(ts) + 1, h = simHour(ts), mm = Math.round((h % 1) * 60) % 60;
+    return `Day ${d}, ${String(Math.floor(h)).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; };
+
+  const KSFarm = { Farm, Season, Weather, advise, render, demoStations, CROPS, SOILS, EFF, SIM_EPOCH, STEP_S, DAY, simDay, simHour, fmtSim, SHORT, WORD };
   if (typeof module !== "undefined" && module.exports) module.exports = KSFarm; else root.KSFarm = KSFarm;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -38,9 +38,12 @@ python -m krishisense --config stations.wokwi.json --db wokwi.db serve   # serve
 - `.vscode/`: recommended extensions + tasks (build Wokwi firmware, server for Wokwi, simulation, tests).
 - `docs/farm3d.html`: "KrishiSense twin". A classic script (window.Twin) runs the sim, time travel (replays from day 0), events and all 2D panels plus a map view; a three.js module (CDN, pinned 0.170.0) plugs in for 3D and falls back to the map after 6 s if it can't load.
 - `docs/` (GitHub Pages site, opens from the link with no install):
-  `index.html` live farm dashboard driven by `farm-engine.js` (JS port of virtual stations + advisor +
-  alert rules, answering the same /api/v1 paths as the server); `season.html` KrishiSense vs fixed-schedule
-  comparison (core between the KS-CORE markers). Both tested by `docs/simulator.test.js`.
+  `index.html` hub: sidebar views (overview, live, twin, compare, hardware) with hash routes (#live etc.); owns one
+  `KSFarm.Season` exposed as `window.KSHub.season`; drives its clock. `live.html` dashboard and `farm3d.html` twin use
+  `parent.KSHub.season` when embedded (class `embedded` hides their own header/controls), else their own Season.
+  `season.html` comparison is a separate what-if model (core between the KS-CORE markers).
+  `farm-engine.js`: Farm (port of virtual stations + advisor + alert rules, same /api/v1 paths as the server) and
+  Season (events, time travel by deterministic replay). All tested by `docs/simulator.test.js`.
 - Keep `farm-engine.js` in step with `advisor.py`, `messages.py` and `service.py` when those change.
 
 ## Rules

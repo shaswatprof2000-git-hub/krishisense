@@ -4,9 +4,15 @@
 
 **A solar soil and weather station that tells farmers when to irrigate, and for how long, on WhatsApp in Odia, Hindi or English.**
 
-▶ **[Open the live farm simulation](https://shaswatprof2000-git-hub.github.io/krishisense/)**: three virtual sensor stations, the irrigation advisor and WhatsApp alerts running in your browser. No install.
-· **[3D digital twin](https://shaswatprof2000-git-hub.github.io/krishisense/farm3d.html)**: explore the farms in 3D, click a field to see its root zone, sensors and advice, and drag through the season. Has a 2D map view that works offline.
-· **[Season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html)**: KrishiSense advice vs a fixed watering schedule.
+▶ **[Open KrishiSense](https://shaswatprof2000-git-hub.github.io/krishisense/)**: one website with everything, running in your browser with nothing to install. Pick a view from the sidebar; they all share one simulated farm and one clock:
+
+| View | What you can do |
+|---|---|
+| Overview | See the three farms right now, the latest WhatsApp message, and how the pieces connect |
+| Live dashboard | Watch every station's soil water, pump runs and WhatsApp alerts |
+| 3D twin | Fly around the farms, click a field to see its root zone, probes and advice; drag through the season |
+| Season comparison | Compare KrishiSense with watering on a fixed schedule, for any crop and soil |
+| Hardware lab | Wiring of the virtual ESP32, how to run it in VS Code, and the real station's parts |
 
 Farmers usually irrigate by habit or by looking at the soil surface. That often means too much water, too
 much diesel or electricity, and stressed crops when they guess wrong. KrishiSense measures soil moisture at
@@ -85,9 +91,10 @@ The server runs unchanged, in simulation mode: its clock follows the readings an
 forecast instead of Open-Meteo. The dashboard at `http://localhost:8080` shows each station's soil water,
 refill point, pump runs and the WhatsApp messages it would have sent. Nothing is sent to real phones.
 
-**In the browser, with nothing to install:** the [live farm](https://shaswatprof2000-git-hub.github.io/krishisense/)
-(`docs/index.html` + `docs/farm-engine.js`) runs the same three stations, advisor, alert rules and dashboard as
-JavaScript, so anyone can open the link and watch a season play out. The
+**In the browser, with nothing to install:** [the website](https://shaswatprof2000-git-hub.github.io/krishisense/)
+(`docs/`) runs the same three stations, advisor and alert rules as JavaScript (`docs/farm-engine.js`). The hub page
+(`docs/index.html`) owns one shared season, and the dashboard (`live.html`) and 3D twin (`farm3d.html`) embedded in it
+read that season, so pausing or jumping to a day moves every view. Each page also works on its own. The
 [season comparison](https://shaswatprof2000-git-hub.github.io/krishisense/season.html) (`docs/season.html`) is a
 simplified model that compares a KrishiSense farmer with a fixed watering schedule; its KrishiSense farmer
 waters on the day the advice says so. Results from all the simulators are illustrative, not field results.

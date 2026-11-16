@@ -43,11 +43,13 @@
   code { background:#f2f1ed; padding:1px 5px; border-radius:4px; }
   footer { color:var(--muted); font-size:13px; margin-top:26px; }
   a { color:var(--blue); }
+  .embedded nav, .embedded footer { display:none; }
 </style>
+<script>try { if (window.parent !== window && window.parent.KSHub) document.documentElement.classList.add("embedded"); } catch (e) {}</script>
 </head>
 <body>
 <div class="wrap">
-  <nav style="margin-bottom:14px;font-size:14px"><a href="./">← Live farm</a> · <b>Season comparison</b></nav>
+  <nav style="margin-bottom:14px;font-size:14px"><a href="./">← All KrishiSense views</a> · <b>Season comparison</b></nav>
   <h1>🌱 KrishiSense: season comparison</h1>
   <p class="lede">A solar soil sensor plus weather forecast tells farmers <b>when to irrigate and for how long</b>, on WhatsApp in Odia, Hindi or English.
     This page simulates a whole season in your browser and compares a farmer who follows KrishiSense with one who waters on a fixed schedule.</p>
